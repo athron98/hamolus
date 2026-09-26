@@ -1,0 +1,57 @@
+{
+  "name": "@hamolus/panel",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "author": "Gilang Albathin Nurhabibi <https://github.com/athron98>",
+  "homepage": "https://github.com/hamolus-labs/hamolus/tree/main/packages/panel#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamolus-labs/hamolus.git",
+    "directory": "packages/panel"
+  },
+  "bugs": {
+    "url": "https://github.com/hamolus-labs/hamolus/issues"
+  },
+  "keywords": [
+    "hamolus",
+    "panel",
+    "client",
+    "sdk",
+    "cloudflare"
+  ],
+  "description": "Framework-neutral browser client for the Hamolus Panel API: bootstrap, records, relations, dashboard metrics and private asset URLs.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hamolus/types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "~5.9.0"
+  }
+}

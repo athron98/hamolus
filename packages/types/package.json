@@ -1,0 +1,58 @@
+{
+  "name": "@hamolus/types",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "author": "Gilang Albathin Nurhabibi <https://github.com/athron98>",
+  "homepage": "https://github.com/hamolus-labs/hamolus/tree/main/packages/types#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamolus-labs/hamolus.git",
+    "directory": "packages/types"
+  },
+  "bugs": {
+    "url": "https://github.com/hamolus-labs/hamolus/issues"
+  },
+  "keywords": [
+    "hamolus",
+    "zod",
+    "schema",
+    "dto",
+    "types",
+    "cloudflare"
+  ],
+  "description": "Shared, versioned data contracts for Hamolus: Zod schemas, TypeScript interfaces and API DTOs for collections, fields, records, media, files, panels, auth and scope.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "~5.9.0"
+  }
+}

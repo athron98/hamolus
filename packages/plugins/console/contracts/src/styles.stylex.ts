@@ -1,0 +1,272 @@
+/**
+ * Shared design tokens and base styles for Hamolus console plugins.
+ *
+ * Imported as `@hamolus/plugin-console-contracts/styles.stylex.ts`. The `.stylex.ts`
+ * extension in the specifier is required, not decorative: the StyleX compiler
+ * only transforms a theme module whose own file is named `*.stylex.ts`, and it
+ * deopts before resolution on a bare specifier. For the same reason this file is
+ * published as raw TypeScript rather than built to `dist` — the tokens must be
+ * compiled by the *consuming* app so its palette CSS variables are emitted and the
+ * class names line up with the host's build.
+ *
+ * Types (`KvClient`, `ConsolePlugin`, …) live in the package root instead, so a
+ * consumer that only needs the shapes never pulls StyleX into its graph.
+ */
+import * as stylex from '@stylexjs/stylex'
+
+export const pluginTokens = stylex.defineVars({
+  bg: 'var(--bg)',
+  surface: 'var(--surface)',
+  surfaceRaised: 'var(--surface-2)',
+  surfaceDeep: 'var(--surface-3)',
+  border: 'var(--border)',
+  borderStrong: 'var(--border-strong)',
+  text: 'var(--text)',
+  textDim: 'var(--text-dim)',
+  accent: 'var(--accent)',
+  accentSoft: 'var(--accent-soft)',
+  accentBold: 'color-mix(in srgb, var(--accent) 26%, transparent)',
+  focusRing: 'var(--focus-ring)',
+  danger: 'var(--danger)',
+  dangerSoft: 'color-mix(in srgb, var(--danger) 16%, transparent)',
+  ok: 'var(--ok)',
+  okSoft: 'color-mix(in srgb, var(--ok) 16%, transparent)',
+  radius: 'var(--radius)',
+  radiusSm: 'var(--radius-sm)',
+  shadowSm: 'var(--shadow-sm)',
+  shadowInput: 'var(--shadow-input)',
+  shadowInputFocus: 'var(--shadow-input-focus)',
+  fontMono: 'var(--font-mono)',
+  fontSans: 'var(--font-sans)',
+})
+
+/** Shared base styles plugins reuse — mirrors the console's button/card vocabulary. */
+export const ps = stylex.create({
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    color: pluginTokens.text,
+    fontFamily: pluginTokens.fontSans,
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  title: {
+    margin: 0,
+    fontSize: 18,
+    fontWeight: 700,
+    letterSpacing: '-0.01em',
+    color: pluginTokens.text,
+  },
+  subtitle: {
+    margin: 0,
+    fontSize: 13,
+    color: pluginTokens.textDim,
+    fontWeight: 400,
+  },
+  card: {
+    backgroundColor: pluginTokens.surface,
+    borderRadius: pluginTokens.radius,
+    boxShadow: `0 0 0 1px ${pluginTokens.border}, ${pluginTokens.shadowSm}`,
+  },
+  row: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  input: {
+    width: '100%',
+    minHeight: 36,
+    borderStyle: 'none',
+    borderRadius: pluginTokens.radius,
+    padding: '0 12px',
+    fontSize: 13.5,
+    color: pluginTokens.text,
+    backgroundColor: pluginTokens.surfaceRaised,
+    boxShadow: `inset 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px transparent`,
+    transition: 'box-shadow 0.15s ease',
+    '::placeholder': {
+      color: pluginTokens.textDim,
+    },
+    ':focus': {
+      outline: 'none',
+      boxShadow: pluginTokens.shadowInputFocus,
+    },
+  },
+  select: {
+    width: '100%',
+    minHeight: 36,
+    borderStyle: 'none',
+    borderRadius: pluginTokens.radius,
+    padding: '0 28px 0 12px',
+    fontSize: 13,
+    color: pluginTokens.text,
+    backgroundColor: pluginTokens.surfaceRaised,
+    boxShadow: `inset 0 1px 2px rgba(0,0,0,0.04)`,
+    appearance: 'none',
+    backgroundImage:
+      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23939cab' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 10px center',
+    ':focus': {
+      outline: 'none',
+      boxShadow: pluginTokens.shadowInputFocus,
+    },
+  },
+  btn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 34,
+    padding: '0 14px',
+    borderStyle: 'none',
+    borderRadius: pluginTokens.radius,
+    fontSize: 13,
+    fontWeight: 600,
+    color: pluginTokens.accent,
+    backgroundColor: 'color-mix(in srgb, var(--accent) 48%, var(--surface))',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.15), 0 1px 1px rgba(0,0,0,0.08)',
+    cursor: 'pointer',
+    transition: 'filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease',
+    ':hover': {
+      filter: 'brightness(1.1)',
+      transform: 'translateY(-1px)',
+    },
+    ':disabled': {
+      opacity: 0.55,
+      cursor: 'default',
+      transform: 'none',
+    },
+  },
+  btnGhost: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 34,
+    padding: '0 12px',
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderColor: pluginTokens.borderStrong,
+    borderRadius: pluginTokens.radius,
+    fontSize: 13,
+    fontWeight: 600,
+    color: pluginTokens.textDim,
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    transition: 'color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease',
+    ':hover': {
+      color: pluginTokens.accent,
+      backgroundColor: pluginTokens.accentSoft,
+    },
+    ':disabled': {
+      opacity: 0.55,
+      cursor: 'default',
+    },
+  },
+  btnDanger: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 34,
+    padding: '0 12px',
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderColor: pluginTokens.borderStrong,
+    borderRadius: pluginTokens.radius,
+    fontSize: 13,
+    fontWeight: 600,
+    color: pluginTokens.danger,
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    transition: 'color 0.15s ease, background-color 0.15s ease',
+    ':hover': {
+      backgroundColor: pluginTokens.dangerSoft,
+    },
+    ':disabled': {
+      opacity: 0.55,
+      cursor: 'default',
+    },
+  },
+  btnIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 30,
+    height: 30,
+    padding: 0,
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderColor: pluginTokens.borderStrong,
+    borderRadius: pluginTokens.radius,
+    color: pluginTokens.textDim,
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    transition: 'color 0.15s ease, background-color 0.15s ease',
+    ':hover': {
+      color: pluginTokens.accent,
+      backgroundColor: pluginTokens.accentSoft,
+    },
+  },
+  btnIconDanger: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 30,
+    height: 30,
+    padding: 0,
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderColor: pluginTokens.borderStrong,
+    borderRadius: pluginTokens.radius,
+    color: pluginTokens.danger,
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    transition: 'color 0.15s ease, background-color 0.15s ease',
+    ':hover': {
+      backgroundColor: pluginTokens.dangerSoft,
+    },
+  },
+  badge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: 18,
+    padding: '1px 8px',
+    borderRadius: pluginTokens.radiusSm,
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    color: pluginTokens.accent,
+    backgroundColor: pluginTokens.accentBold,
+  },
+  mono: {
+    fontFamily: pluginTokens.fontMono,
+    fontSize: 12,
+    color: pluginTokens.textDim,
+  },
+  text: {
+    fontSize: 13.5,
+    color: pluginTokens.text,
+    lineHeight: 1.5,
+  },
+  dim: {
+    fontSize: 12.5,
+    color: pluginTokens.textDim,
+  },
+  grid: {
+    display: 'grid',
+    gap: 10,
+  },
+  disabled: {
+    opacity: 0.55,
+    pointerEvents: 'none',
+  },
+})

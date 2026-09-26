@@ -1,0 +1,47 @@
+{
+  "name": "hamolus",
+  "version": "0.1.0",
+  "description": "Metadata-driven headless CMS and application platform for Cloudflare Workers — core API, generated console and panels, MCP server, and a scaffolding CLI.",
+  "license": "MIT",
+  "author": "Gilang Albathin Nurhabibi <https://github.com/athron98>",
+  "homepage": "https://github.com/hamolus-labs/hamolus#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamolus-labs/hamolus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hamolus-labs/hamolus/issues"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "headless-cms",
+    "d1",
+    "hono",
+    "drizzle",
+    "mcp",
+    "solidjs"
+  ],
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "hamolus": "node packages/cli/bin/hamolus.mjs",
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "clean": "turbo clean",
+    "check:panel-acl": "pnpm -F @hamolus/core check:panel-acl",
+    "check:scope-colony-resolution": "pnpm -F @hamolus/core check:scope-colony-resolution",
+    "deploy:core": "pnpm -F @hamolus/core deploy",
+    "deploy:console": "pnpm -F @hamolus/console deploy",
+    "deploy:mcp": "pnpm -F @hamolus/mcp deploy",
+    "check:workspace-glob": "node packages/cli/scripts/check-workspace-glob.mjs",
+    "check:markers": "node packages/cli/scripts/check-markers.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.2",
+    "typescript": "~5.9.0"
+  }
+}

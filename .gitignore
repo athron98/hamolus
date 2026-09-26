@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.astro/
+.next/
+out/
+
+# Tooling caches
+.turbo/
+.wrangler/
+.vite/
+*.tsbuildinfo
+
+# Local environment & secrets — never commit
+.env
+.env.*
+!.env.example
+.dev.vars
+*.dev.vars
+.dev.vars.*
+
+# Cloudflare / wrangler auth
+.wrangler/
+.mf/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Private, client-specific material — never published, never committed.
+# Safety net in case such material is ever added back under examples/private/.
+examples/private/
+
+# Copied into the CLI package at pack time (see packages/cli/scripts/copy-templates.mjs)
+packages/cli/templates/

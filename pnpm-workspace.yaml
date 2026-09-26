@@ -1,0 +1,19 @@
+packages:
+  - 'packages/*'
+  - 'packages/plugins/*/*'
+
+# Trusted build scripts of transitive dependencies.
+onlyBuiltDependencies:
+  - esbuild
+  - workerd
+  - sharp
+
+allowBuilds:
+  core-js-pure: true
+  esbuild: true
+  workerd: true
+
+minimumReleaseAgeExclude:
+  - '@cloudflare/workers-types@5.20260920.1'
+  - '@modelcontextprotocol/core@2.1.0'
+  - '@modelcontextprotocol/server@2.1.0'

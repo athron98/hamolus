@@ -1,0 +1,126 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
+/**
+ * Terminal output for the `hamolus` CLI.
+ *
+ * Kept free of Side Effects so the file can also be imported by tests without
+ * printing anything.
+ */
+
+export const CLI_NAME = 'hamolus'
+export const CLI_VERSION = '0.1.0'
+
+export const CORE_MODES = ['independent', 'centralized', 'proxy', 'bridge'] as const
+export type CoreMode = (typeof CORE_MODES)[number]
+
+export function usage(): string {
+  return [
+    `${CLI_NAME} — scaffold Hamolus projects, consoles, panels and MCP servers.`,
+    '',
+    'Usage:',
+    `  ${CLI_NAME} create <name> [options]      Create a new Hamolus project (with a core)`,
+    `  ${CLI_NAME} add console [options]        Add a console to the current project`,
+    `  ${CLI_NAME} add panel <name> [options]   Add a panel app to the current project`,
+    `  ${CLI_NAME} add mcp [options]            Add an MCP server to the current project`,
+    `  ${CLI_NAME} add plugin <name> [options]  Add a console plugin to the current project`,
+    `  ${CLI_NAME} add seed <name> [options]    Add a seed script to the current project`,
+    `  ${CLI_NAME} add configuration <name>     Add a wrangler/KV configuration preset`,
+    `  ${CLI_NAME} link <path>                  Point @hamolus/* deps at a local checkout`,
+    `  ${CLI_NAME} link --clear                 Put @hamolus/* deps back on the registry`,
+    `  ${CLI_NAME} list                         List what the current project contains`,
+    `  ${CLI_NAME} help                         Show this help`,
+    '',
+    'Common options:',
+    '  -o, --output <path>     Write to an explicit path instead of the project default',
+    '      --mode <mode>      Core mode for `create`: independent | centralized | proxy | bridge',
+    '      --template <path>  Use an explicit template directory (skips resolution)',
+    '      --source <path>    Use an explicit source directory (skips package resolution)',
+    '      --package <name>   Use a specific published package version as the source',
+    '      --link <path>      Link @hamolus/* deps into a local Hamolus checkout',
+    '      --clear            `link` only: undo the link (back to registry ranges)',
+    '      --force            Overwrite the target directory if it already exists',
+    '      --dry-run          Print the plan without writing anything',
+    '  -y, --yes              Assume "yes" for every prompt',
+    '  -h, --help             Show this help',
+    '',
+    'Examples:',
+    `  ${CLI_NAME} create acme`,
+    `  ${CLI_NAME} create acme --mode centralized`,
+    `  ${CLI_NAME} add console`,
+    `  ${CLI_NAME} add panel shop_ops`,
+    `  ${CLI_NAME} add mcp`,
+    `  ${CLI_NAME} add plugin todo`,
+    `  ${CLI_NAME} create acme --link ../hamolus   develop against a local checkout`,
+  ].join('\n')
+}
+
+export function commandHelp(command: 'create' | 'add' | 'link'): string {
+  if (command === 'link') return linkHelp()
+  if (command === 'create') {
+  return [
+      `Usage: ${CLI_NAME} create <name> [options]`,
+      '',
+      'Creates a new Hamolus project directory containing a core (the API Worker),',
+      'a workspace manifest and a `hamolus.json` project file. Additional parts are',
+      'added afterwards with `hamolus add`.',
+      '',
+      'Options:',
+      '      --mode <mode>      Core mode (default: independent)',
+      `                          ${CORE_MODES.join(' | ')}`,
+      '  -o, --output <path>     Output directory (default: ./<name>)',
+      '      --link <path>      Link @hamolus/* into a local checkout (skips the registry)',
+      '      --force            Overwrite an existing directory',
+      '      --dry-run          Print the plan without writing anything',
+      '  -y, --yes               Assume "yes" for every prompt',
+      '  -h, --help              Show this help',
+    ].join('\n')
+  }
+  return [
+    `Usage: ${CLI_NAME} add <target> [name] [options]`,
+    '',
+    'Targets:',
+    '  console        A SolidJS admin console (collections, records, media, panels)',
+    '  panel <name>   A generated SolidJS panel app driven by a core panel manifest',
+    '  mcp            A Model Context Protocol server exposing the core API',
+    '  plugin <name>  A console plugin (todo, kanban) wired into an existing console',
+    '  seed <name>    A self-cleaning seed script for the core',
+    '  configuration  A wrangler + KV configuration preset',
+    '',
+    'Options:',
+    '  -o, --output <path>     Write to an explicit path',
+    '      --template <path>  Use an explicit template directory',
+    '      --source <path>    Use an explicit source directory',
+    '      --package <name>   Use a specific published package version as the source',
+    '      --link <path>      Link @hamolus/* deps into a local Hamolus checkout',
+    '      --force            Overwrite the target directory',
+    '      --dry-run          Print the plan without writing anything',
+    '  -y, --yes               Assume "yes" for every prompt',
+    '  -h, --help              Show this help',
+  ].join('\n')
+}
+
+function linkHelp(): string {
+  return [
+    `Usage: ${CLI_NAME} link <path>`,
+    `       ${CLI_NAME} link --clear`,
+    '',
+    'Points every generated workspace member at a local Hamolus checkout instead of',
+    'the npm registry. Use it while the packages are still in development — including',
+    'when generating this repo\'s own examples/, which must exercise the working tree.',
+    '',
+    'The checkout is recorded in hamolus.json, so later `hamolus add` calls inherit it.',
+    '',
+    'Options:',
+    '      --clear            Undo the link, restoring registry version ranges',
+    '  -h, --help              Show this help',
+    '',
+    'Examples:',
+    `  ${CLI_NAME} link ../hamolus`,
+    `  ${CLI_NAME} link ~/code/hamolus`,
+    `  ${CLI_NAME} link --clear`,
+  ].join('\n')
+}

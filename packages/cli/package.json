@@ -1,0 +1,65 @@
+{
+  "name": "@hamolus/cli",
+  "version": "0.1.0",
+  "description": "Scaffold and extend Hamolus projects: cores, consoles, panels, MCP servers, plugins, seeds and deployment configurations.",
+  "keywords": [
+    "hamolus",
+    "scaffold",
+    "generator",
+    "cli",
+    "cms",
+    "cloudflare-workers"
+  ],
+  "license": "MIT",
+  "author": "Gilang Albathin Nurhabibi <https://github.com/athron98>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamolus-labs/hamolus.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/hamolus-labs/hamolus#readme",
+  "bugs": {
+    "url": "https://github.com/hamolus-labs/hamolus/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "bin": {
+    "hamolus": "bin/hamolus.mjs"
+  },
+  "main": "./dist/cli.js",
+  "module": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "node --watch --experimental-strip-types src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build",
+    "check:workspace-glob": "node scripts/check-workspace-glob.mjs",
+    "prepack": "node scripts/copy-templates.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsup": "^8.5.1",
+    "typescript": "~5.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

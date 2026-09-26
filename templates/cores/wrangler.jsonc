@@ -1,0 +1,63 @@
+{
+  // Worker name + entry point
+  //
+  // `main` points at the local seam in src/index.ts, which re-exports the app from
+  // @hamolus/core. Edit that file to wrap the app; you never need to fork the package.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "{{PROJECT_SLUG}}-core",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // D1 database (records + collection metadata)
+  //
+  // The id below is a placeholder. Create the real resource once, then paste the id
+  // wrangler prints:
+  //   wrangler d1 create {{DB_NAME}}
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "{{DB_NAME}}",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+
+  // KV namespace (settings blob)
+  //   wrangler kv namespace create {{KV_NAMESPACE}}
+  "kv_namespaces": [
+    {
+      "binding": "SETTINGS",
+      "id": "00000000000000000000000000000000"
+    }
+  ],
+
+  // R2 bucket (media + file libraries)
+  //   wrangler r2 bucket create {{BUCKET_NAME}}
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "{{BUCKET_NAME}}"
+    }
+  ],
+
+  "vars": {
+    // Multi-tenant mode: independent | centralized | proxy | bridge
+    "CORE_MODE": "{{CORE_MODE}}",
+
+    // Land used by bare (unprefixed) tenant requests.
+    "DEFAULT_LAND": "default",
+
+    // Public sites read collections and settings without a token (GET only).
+    // Auth-guarded GETs (/api/_auth/*, /api/_meta/universe/*) still require a session.
+    // "true" for an independent core, "false" for every multi-tenant mode.
+    "PUBLIC_GETS": "{{PUBLIC_GETS}}"
+  }
+
+  // Credentials are SECRETS, never vars — a secret and a var cannot share a name.
+  //   wrangler secret put JWT_SECRET
+  //   wrangler secret put ADMIN_KEY
+  //   wrangler secret put SUPER_ADMIN_USERNAME
+  //   wrangler secret put SUPER_ADMIN_PASSWORD
+  //
+  // PANEL_ASSET_SECRET is optional; it falls back to JWT_SECRET when unset.
+}

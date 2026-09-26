@@ -1,0 +1,80 @@
+{
+  "name": "@hamolus/console",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "author": "Gilang Albathin Nurhabibi <https://github.com/athron98>",
+  "homepage": "https://github.com/hamolus-labs/hamolus/tree/main/packages/console#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamolus-labs/hamolus.git",
+    "directory": "packages/console"
+  },
+  "bugs": {
+    "url": "https://github.com/hamolus-labs/hamolus/issues"
+  },
+  "keywords": [
+    "hamolus",
+    "console",
+    "admin",
+    "cms",
+    "solidjs",
+    "cloudflare"
+  ],
+  "description": "The Hamolus console: a SolidJS + StyleX admin app for collections, records, media, files, panels, users and multi-land scope. Published as a template — `hamolus add console` generates a console from this source into your project.",
+  "hamolus": {
+    "kind": "template",
+    "template": "console",
+    "copy": [
+      "src",
+      "index.html",
+      "vite.config.ts",
+      "tsconfig.json",
+      "wrangler.jsonc"
+    ],
+    "exclude": [
+      "src/plugins/**"
+    ]
+  },
+  "files": [
+    "src",
+    "index.html",
+    "vite.config.ts",
+    "tsconfig.json",
+    "wrangler.jsonc",
+    "docs",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "deploy": "pnpm build && wrangler deploy"
+  },
+  "dependencies": {
+    "@hamolus/types": "workspace:*",
+    "@lexical/link": "^0.51.0",
+    "@lexical/list": "^0.51.0",
+    "@lexical/rich-text": "^0.51.0",
+    "@lexical/selection": "^0.51.0",
+    "@lexical/utils": "^0.51.0",
+    "@solidjs/router": "^1.0.0",
+    "@stylexjs/stylex": "^0.19.1",
+    "@tanstack/solid-query": "^5.103.1",
+    "lexical": "^0.51.0",
+    "solid-js": "^1.9.15"
+  },
+  "devDependencies": {
+    "@stylexjs/unplugin": "^0.19.1",
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.0",
+    "vite": "^8.3.0",
+    "vite-plugin-solid": "^2.11.14",
+    "wrangler": "^4.135.0"
+  }
+}

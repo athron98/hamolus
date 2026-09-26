@@ -1,0 +1,69 @@
+{
+  // {{CONFIG_NAME}} — a deployment preset for the {{CONFIG_ID}} environment.
+  //
+  // A configuration is the deployment *surface* of a core: which D1, KV and R2 resources
+  // the worker binds to, plus its non-secret vars. The worker source is not duplicated
+  // here — `main` points back at the core part, so several configurations (staging,
+  // production, one per land) can deploy the same code against different resources.
+  //
+  // Deploy with:
+  //   pnpm -F ./configs/{{CONFIG_ID}} deploy
+  //
+  // Verify before deploying:
+  //   node ./verify.mjs
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "{{CONFIG_SLUG}}-core",
+  "main": "../../core/src/index.ts",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // D1 database (records + collection metadata)
+  //
+  // The id is a placeholder until you create the resource and paste the real one:
+  //   wrangler d1 create {{CONFIG_SLUG}}-db
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "{{CONFIG_SLUG}}-db",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+
+  // KV namespace (settings blob)
+  //   wrangler kv namespace create SETTINGS
+  "kv_namespaces": [
+    {
+      "binding": "SETTINGS",
+      "id": "00000000000000000000000000000000"
+    }
+  ],
+
+  // R2 bucket (media + file libraries)
+  //   wrangler r2 bucket create {{CONFIG_SLUG}}-media
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "{{CONFIG_SLUG}}-media"
+    }
+  ],
+
+  "vars": {
+    // Multi-tenant mode: independent | centralized | proxy | bridge
+    "CORE_MODE": "independent",
+
+    // Land used by bare (unprefixed) tenant requests.
+    "DEFAULT_LAND": "default",
+
+    // Public sites read collections and settings without a token (GET only).
+    // Auth-guarded GETs (/api/_auth/*, /api/_meta/universe/*) still require a session.
+    "PUBLIC_GETS": "true"
+  }
+
+  // Credentials are SECRETS, never vars — a secret and a var cannot share a name.
+  //   wrangler secret put JWT_SECRET --config ./wrangler.jsonc
+  //   wrangler secret put ADMIN_KEY --config ./wrangler.jsonc
+  //   wrangler secret put SUPER_ADMIN_USERNAME --config ./wrangler.jsonc
+  //   wrangler secret put SUPER_ADMIN_PASSWORD --config ./wrangler.jsonc
+  //
+  // PANEL_ASSET_SECRET is optional; it falls back to JWT_SECRET when unset.
+}

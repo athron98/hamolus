@@ -1,0 +1,38 @@
+{
+  "name": "@hamolus/plugin-console-todo",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@hamolus/plugin-console-contracts": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "description": "Per-land todo list plugin for the Hamolus console, stored in KV.",
+  "sideEffects": false,
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@stylexjs/stylex": "^0.19.1",
+    "solid-js": "^1.9.15"
+  },
+  "devDependencies": {
+    "@stylexjs/stylex": "^0.19.1",
+    "solid-js": "^1.9.15",
+    "tsup": "^8.5.0",
+    "typescript": "~5.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

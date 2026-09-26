@@ -1,0 +1,56 @@
+{
+  "name": "@hamolus/plugin-console-contracts",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Types and shared StyleX design tokens for Hamolus console plugins.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./styles.stylex.ts": "./src/styles.stylex.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src/styles.stylex.ts",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@stylexjs/stylex": "^0.19.1",
+    "solid-js": "^1.9.15"
+  },
+  "devDependencies": {
+    "@stylexjs/stylex": "^0.19.1",
+    "solid-js": "^1.9.15",
+    "tsup": "^8.5.0",
+    "typescript": "~5.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamolus-labs/hamolus.git",
+    "directory": "packages/plugins/console/contracts"
+  },
+  "keywords": [
+    "hamolus",
+    "console",
+    "plugin",
+    "stylex",
+    "design-tokens",
+    "cloudflare"
+  ]
+}
