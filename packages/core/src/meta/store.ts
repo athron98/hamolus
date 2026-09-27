@@ -10,7 +10,7 @@
 
 import { and, eq, sql } from 'drizzle-orm'
 import type { CollectionDefinition } from '@hamolus/types'
-import { COLONY_DEFAULT, LAND_DEFAULT, collectionDefinitionSchema } from '@hamolus/types'
+import { COLONY_DEFAULT, LAND_DEFAULT, collectionDefinitionSchema, toMcpCollectionMode } from '@hamolus/types'
 import type { Db } from '../db/client'
 import { metaCollections, type MetaCollectionRow } from '../db/schema'
 import { addColumnSql, auditColumns, buildCreateTableSql, buildDropTableSql, isIdentifier, physicalTable, quoteIdentifier, stampPhysicalTable } from '../db/table'
@@ -134,6 +134,7 @@ export async function ensureMetaTable(db: Db): Promise<void> {
           timestamps INTEGER NOT NULL DEFAULT 0,
           soft_delete INTEGER NOT NULL DEFAULT 0,
           primary_key TEXT NOT NULL DEFAULT 'id',
+          mcp TEXT,
           fields TEXT NOT NULL,
           created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
           updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
@@ -166,6 +167,9 @@ export async function ensureMetaTable(db: Db): Promise<void> {
         }
         if (!colNames.has('icon')) {
           await db.run(sql`ALTER TABLE _meta_collections ADD COLUMN icon TEXT`)
+        }
+        if (!colNames.has('mcp')) {
+          await db.run(sql`ALTER TABLE _meta_collections ADD COLUMN mcp TEXT`)
         }
 
         // Normalize the pre-scope `default` land id to the reserved root land.
@@ -205,6 +209,7 @@ export async function ensureMetaTable(db: Db): Promise<void> {
               timestamps INTEGER NOT NULL DEFAULT 0,
               soft_delete INTEGER NOT NULL DEFAULT 0,
               primary_key TEXT NOT NULL DEFAULT 'id',
+              mcp TEXT,
               fields TEXT NOT NULL,
               created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
               updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
@@ -212,8 +217,8 @@ export async function ensureMetaTable(db: Db): Promise<void> {
             )
           `))
           await db.run(sql.raw(`
-            INSERT INTO _meta_collections (land, colony, name, label, description, "group", icon, timestamps, soft_delete, primary_key, fields, created_at, updated_at)
-            SELECT land, colony, name, label, description, "group", icon, timestamps, soft_delete, primary_key, fields, created_at, updated_at
+            INSERT INTO _meta_collections (land, colony, name, label, description, "group", icon, timestamps, soft_delete, primary_key, mcp, fields, created_at, updated_at)
+            SELECT land, colony, name, label, description, "group", icon, timestamps, soft_delete, primary_key, mcp, fields, created_at, updated_at
             FROM _meta_collections_legacy
           `))
           await db.run(sql`DROP TABLE IF EXISTS _meta_collections_legacy`)
@@ -290,6 +295,7 @@ function rowToDefinition(row: MetaCollectionRow, land: string, colony: string): 
       timestamps: row.timestamps ?? false,
       softDelete: row.softDelete ?? false,
       primaryKey: row.primaryKey ?? 'id',
+      mcp: row.mcp == null ? undefined : toMcpCollectionMode(row.mcp),
       fields,
     },
     land,
@@ -351,6 +357,7 @@ export async function putCollection(
       timestamps: def.timestamps ?? false,
       softDelete: def.softDelete ?? false,
       primaryKey: def.primaryKey ?? 'id',
+      mcp: def.mcp ?? null,
       fields: JSON.stringify(def.fields),
       updatedAt: now,
     })
@@ -364,6 +371,7 @@ export async function putCollection(
         timestamps: def.timestamps ?? false,
         softDelete: def.softDelete ?? false,
         primaryKey: def.primaryKey ?? 'id',
+        mcp: def.mcp ?? null,
         fields: JSON.stringify(def.fields),
         updatedAt: now,
       },
