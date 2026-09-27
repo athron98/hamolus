@@ -1,3 +1,4 @@
+// Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>, MIT
 import {
   For,
   Show,
@@ -21,7 +22,7 @@ import type {
   PanelTableViewDefinition,
   PanelViewDefinition,
 } from '@hamolus/panel'
-import type { PanelConfig } from './panel'
+import type { PanelRuntimeConfig } from '@hamolus/panel'
 import { missingTokenMessage } from './panel'
 import {
   FONTS,
@@ -67,13 +68,16 @@ type RecordsViewProps = {
   onRetry: () => void
 }
 
-export function App(props: { panel: PanelConfig }) {
+export function App(props: { panel: PanelRuntimeConfig }) {
   const [runtime, setRuntime] = createSignal<RuntimeState>()
   const [activeViewId, setActiveViewId] = createSignal<string>()
   const [refreshToken, setRefreshToken] = createSignal(0)
   const [loading, setLoading] = createSignal(true)
   const [error, setError] = createSignal<PanelError>()
   const [sidebarOpen, setSidebarOpen] = createSignal(false)
+  // The core owns localization. `panel.locale` (VITE_PANEL_LOCALE) only preselects one
+  // for the first request; this is replaced by the project's real list below.
+  const [locale, setLocale] = createSignal<string | undefined>(props.panel.locale)
   let disposed = false
 
   onCleanup(() => {
@@ -89,8 +93,23 @@ export function App(props: { panel: PanelConfig }) {
           land: props.panel.land,
           colony: props.panel.colony,
         })
+        // Asked in parallel with the bootstrap. It is a public endpoint and it only
+        // decides which locale records are requested in, so a failure here must not
+        // take the panel down with it — the preselected locale is a fine answer.
+        const localization = await client
+          .getLocalization()
+          .catch(() => null)
+
         const bootstrap = await client.bootstrap(props.panel.id)
         if (disposed) return
+
+        if (localization) {
+          const declared = localization.locales.map((entry) => entry.code)
+          const preselected = props.panel.locale
+          setLocale(
+            preselected && declared.includes(preselected) ? preselected : localization.defaultLocale,
+          )
+        }
 
         const views = bootstrap.panel.views
         const requestedView = props.panel.defaultView
@@ -103,7 +122,7 @@ export function App(props: { panel: PanelConfig }) {
         setActiveViewId(selectedView)
       } catch (cause) {
         if (!disposed) {
-          const missing = missingTokenMessage()
+          const missing = missingTokenMessage(props.panel)
           setError(
             missing
               ? ({ code: 'MISSING_TOKEN', message: missing } as PanelError)
@@ -277,7 +296,7 @@ export function App(props: { panel: PanelConfig }) {
                       panelId={props.panel.id}
                       view={view}
                       refreshToken={refreshToken()}
-                      locale={props.panel.locale}
+                      locale={locale()}
                     />
                   ) : null
                 }}

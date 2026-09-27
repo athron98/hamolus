@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { createSignal, For, Show } from 'solid-js'
 import * as stylex from '@stylexjs/stylex'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'

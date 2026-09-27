@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { Hono } from 'hono'
 import type { AuthTokenPayload, FilterMap } from '@hamolus/types'
 import { buildEntitySchema, buildPaginationMeta, bulkDeleteSchema, listQuerySchema } from '@hamolus/types'
@@ -9,6 +19,7 @@ import { getSettings } from '../meta/settings'
 import { PROTECTED_COLLECTION } from '../auth/privileges'
 import { requireRead, requireWrite } from '../auth/session'
 import { resolveRequestScope } from '../scope'
+import { effectiveLocaleCodes } from '../config'
 import {
   bulkDeleteRecords,
   createRecord,
@@ -26,15 +37,6 @@ function writePerm(defName: string): 'users.write' | 'records.write' {
 
 function formatZodIssues(issues: { message: string; path?: unknown }[]): string {
   return issues.map((i) => `${String(i.path ?? 'input')}: ${i.message}`).join('; ')
-}
-
-function getLanguages(settings: Record<string, unknown>): string[] {
-  const loc = settings.localization
-  if (loc && typeof loc === 'object' && 'languages' in loc) {
-    const langs = (loc as Record<string, unknown>).languages
-    if (Array.isArray(langs) && langs.every((l) => typeof l === 'string')) return langs as string[]
-  }
-  return []
 }
 
 /** Lightweight: returns only the lastUpdate hash for a collection. */
@@ -102,7 +104,7 @@ dynamicRoutes.post('/:collection', async (c) => {
   if (!input || typeof input !== 'object') throw badRequest('Body must be a JSON object')
 
   const settings = await getSettings(c.env.SETTINGS, scope.land, scope.colony)
-  const languages = getLanguages(settings)
+  const languages = effectiveLocaleCodes(settings)
   const parsed = buildEntitySchema(def, languages).safeParse(input)
   if (!parsed.success) throw badRequest('Validation failed: ' + formatZodIssues(parsed.error.issues), 'VALIDATION')
   const row = await createRecord(db, def, parsed.data, payload?.username ?? 'system')
@@ -119,7 +121,7 @@ dynamicRoutes.put('/:collection/:id', async (c) => {
   if (!input || typeof input !== 'object') throw badRequest('Body must be a JSON object')
 
   const settings = await getSettings(c.env.SETTINGS, scope.land, scope.colony)
-  const languages = getLanguages(settings)
+  const languages = effectiveLocaleCodes(settings)
   const parsed = buildEntitySchema(def, languages).partial().safeParse(input)
   if (!parsed.success) throw badRequest('Validation failed: ' + formatZodIssues(parsed.error.issues), 'VALIDATION')
   const row = await updateRecord(db, def, c.req.param('id'), parsed.data, payload?.username ?? 'system')
@@ -136,7 +138,7 @@ dynamicRoutes.patch('/:collection/:id', async (c) => {
   if (!input || typeof input !== 'object') throw badRequest('Body must be a JSON object')
 
   const settings = await getSettings(c.env.SETTINGS, scope.land, scope.colony)
-  const languages = getLanguages(settings)
+  const languages = effectiveLocaleCodes(settings)
   const parsed = buildEntitySchema(def, languages).partial().safeParse(input)
   if (!parsed.success) throw badRequest('Validation failed: ' + formatZodIssues(parsed.error.issues), 'VALIDATION')
   const row = await updateRecord(db, def, c.req.param('id'), parsed.data, payload?.username ?? 'system')

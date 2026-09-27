@@ -80,6 +80,13 @@ pnpm -F @hamolus/console deploy
 `single-page-application` makes every unknown path return `index.html` so the client
 router can resolve it. Requests to static assets are free and unlimited.
 
+Serve it from the domain **root**, and leave Vite's `base` at `/`: because every
+unknown path is rewritten to `index.html`, a deep link like `/collections/posts`
+must still find `/assets/…`, which only root-absolute URLs do. A relative base
+would resolve against `/collections/` and 404. A generated console
+(`hamolus add console`) ships the same `assets` block, and its `vite.config.ts`
+documents what to change if you ever front it under a prefix instead.
+
 In development the console proxies `/api` to the core (one origin, no CORS
 preflight). Once deployed it calls the core cross-origin, which the core allows on
 `/api/*` (`cors()`), so no extra configuration is needed.
@@ -115,10 +122,12 @@ Configure the URL, credentials and (optional) land through the variables in
 ```bash
 pnpm check:scope-colony-resolution
 pnpm check:panel-acl            # needs a running core
+pnpm check:code-defined-core    # needs a core generated from the basic template
 ```
 
 Both target the local core by default; point them at a deployment with `BASE=` and
-`ADMIN_KEY=` (see `packages/core/scripts/check-*.mjs`).
+`ADMIN_KEY=` (see `packages/core/scripts/check-*.mjs`). `check:code-defined-core` refuses a
+non-loopback `BASE` on purpose — it registers and deletes a land, a colony and a collection.
 
 ## Notes
 

@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { createSignal, For, onMount, Show } from 'solid-js'
 import * as stylex from '@stylexjs/stylex'
 import { api } from '../lib/api'
@@ -138,7 +148,7 @@ export function LoginPage() {
         <p {...stylex.props(styles.subtitle)}>
           {mode() === 'setup'
             ? 'No users yet — create the first administrator account.'
-            : 'Manage collections, records, media, users &amp; configuration.'}
+            : 'Manage collections, records, media, users & configuration.'}
         </p>
 
         <Show when={!loadingSetup()}>

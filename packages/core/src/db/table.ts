@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import type { CollectionDefinition, FieldDefinition, FieldType } from '@hamolus/types'
 import { COLONY_DEFAULT, LAND_DEFAULT, TABLE_SEP } from '@hamolus/types'
 
@@ -86,7 +96,8 @@ const SQLITE_COLUMN: Record<FieldType, string> = {
   attachment: 'TEXT',
   json: 'TEXT',
   number: 'NUMERIC',
-  price: 'NUMERIC',
+  currency: 'NUMERIC',
+  custom_currency: 'NUMERIC',
   boolean: 'INTEGER',
 }
 

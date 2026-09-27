@@ -1,6 +1,10 @@
 /**
  * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
  *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
  * Licensed under the MIT License. See the LICENSE file at the repository root.
  */
 
@@ -33,6 +37,15 @@ export interface ParsedArgs {
   options: {
     output?: string
     mode?: CoreMode
+    /**
+     * Name of the core template to generate from, e.g. `basic` or `predefined`.
+     *
+     * Only `create` reads it: a core ships several named templates rather than one
+     * file tree, and the name picks between them. The set is open — a repository may
+     * add its own — so the value is checked for shape, by the command that uses it,
+     * rather than against a list of known names.
+     */
+    core?: string
     template?: string
     source?: string
     package?: string
@@ -44,6 +57,7 @@ export interface ParsedArgs {
 const OPTIONS = {
   output: { type: 'string', short: 'o' },
   mode: { type: 'string' },
+  core: { type: 'string' },
   template: { type: 'string' },
   source: { type: 'string' },
   package: { type: 'string' },
@@ -93,6 +107,7 @@ export function parse(argv: string[]): ParsedArgs {
     options: {
       output: parsed.values.output,
       mode: parsed.values.mode,
+      core: parsed.values.core,
       template: parsed.values.template,
       source: parsed.values.source,
       package: parsed.values.package,

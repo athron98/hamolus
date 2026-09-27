@@ -1,0 +1,14 @@
+{
+  // Cloudflare Workers — the console as static assets only (no script).
+  // Static asset requests are free and unlimited.
+  // Deploy: `pnpm -F {{PACKAGE_NAME}} deploy` → `wrangler deploy`.
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "{{PROJECT_SLUG}}-console",
+  "compatibility_date": "2025-12-01",
+  "assets": {
+    "directory": "./dist",
+    // The console is a single-page app: /collections/posts is a client route, so a
+    // deep link that misses on disk has to fall through to index.html.
+    "not_found_handling": "single-page-application"
+  }
+}

@@ -1,0 +1,100 @@
+---
+import Base from '../../../layouts/Base.astro'
+import {
+  effectiveLocales,
+  getCompanyProfile,
+  getTeamMember,
+  memberSlug,
+} from '../../../lib/company'
+import type { TeamMember } from '../../../lib/company'
+import { HamolusApiError, listRecords } from '../../../lib/hamolus'
+import type { LocaleDefinition } from '../../../lib/hamolus'
+
+/**
+ * A profile page: one record for the company, one record per team member.
+ *
+ * The important difference from the blog example: here every page fetches **one** record
+ * through `GET /api/{collection}/{id}` instead of filtering a big list in memory. That works
+ * because `getStaticPaths` has already told this page which id it needs to build.
+ */
+
+export async function getStaticPaths() {
+  const { defaultLocale: fallback, locales } = await effectiveLocales()
+
+  // One request per language, then cross-mapped. With 12 people on the team and two
+  // languages, that is two list requests — not 24 detail requests.
+  const pages = await Promise.all(
+    locales.map(async (entry) => {
+      const listing = await listRecords<TeamMember>('team_members', {
+        page: 1,
+        pageSize: 50,
+        sortBy: 'order',
+        sortDir: 'asc',
+        locale: entry.code,
+      })
+      return { locale: entry.code, members: listing.data }
+    }),
+  )
+
+  const byLocale = new Map(pages.map((page) => [page.locale, page.members]))
+
+  return locales.flatMap((entry) => {
+    const members = byLocale.get(entry.code) ?? []
+    return members.flatMap((member) => [
+      {
+        params: { locale: entry.code, slug: memberSlug(member) },
+        props: { id: member.id, locale: entry.code, fallback, locales },
+      },
+    ])
+  })
+}
+
+interface Props {
+  id: string
+  locale: string
+  fallback: string
+  /** The language list from the core, passed to the layout for the switcher menu. */
+  locales: LocaleDefinition[]
+}
+
+const { id, locale, fallback, locales } = Astro.props
+
+let member: TeamMember
+let tagline = ''
+try {
+  member = (await getTeamMember(id, locale)).data
+  tagline = (await getCompanyProfile(locale))?.tagline ?? ''
+} catch (cause) {
+  if (cause instanceof HamolusApiError) {
+    throw new Error(`Team member ${id} could not be loaded: ${cause.code} ${cause.message}`, {
+      cause,
+    })
+  }
+  throw cause
+}
+---
+
+<Base
+  title={`${member.name} — Hamolus Corp`}
+  description={member.bio}
+  lang={locale}
+  locales={locales}
+>
+  <p>
+    <a href={`/${locale}/`}>← Back ({locale})</a>
+  </p>
+  {locale !== fallback && <p><a href={`/${fallback}/`}>Open the {fallback} version</a></p>}
+
+  <h1>{member.name}</h1>
+  {tagline && <p>{tagline}</p>}
+  <p class="meta">{member.role}</p>
+  {member.photo && <img src={member.photo} alt={member.name} width="200" height="200" />}
+  <div class="prose">
+    <p>{member.bio}</p>
+  </div>
+  {member.email && (
+    <p>
+      <a href={`mailto:${member.email}`}>{member.email}</a>
+    </p>
+  )}
+</Base>

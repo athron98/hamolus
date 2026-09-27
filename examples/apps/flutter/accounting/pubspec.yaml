@@ -1,0 +1,26 @@
+name: hamolus_example_accounting
+description: >-
+  Example Flutter accounting app that reads journal entries and invoices from a Hamolus core.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # `package:http` is used instead of the `dart:io` HttpClient because `dart:io` does not
+  # exist on the web. This example runs on both desktop and web, so the client has to have
+  # a single implementation for both. The rest is plain REST: GET, accept header, JSON in.
+  #
+  # `Client` is also injectable, so tests can use `MockClient` without a network.
+  http: ^1.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

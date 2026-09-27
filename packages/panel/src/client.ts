@@ -1,11 +1,23 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import type {
   PanelAssetListResponse,
   PanelAssetObject,
   PanelBootstrap,
   PanelDefinition,
   PanelMetricResult,
+  ResolvedLocalization,
 } from '@hamolus/types'
-import { PanelError, normalizePanelError } from './errors'
+import { PanelError, isPanelRecord, normalizePanelError, panelResponseError } from './errors'
+import { fetchPanelLocalization } from './localization'
 import type {
   PanelAssetExpiryOptions,
   PanelAssetListQuery,
@@ -85,6 +97,26 @@ export class PanelClient {
 
   deletePanel(panelId: string, options?: PanelCallOptions): Promise<void> {
     return this.request<void>(panelPath(panelId), { method: 'DELETE' }, undefined, options)
+  }
+
+  /**
+   * The project's locales, as the core reports them.
+   *
+   * The core is the single source of truth for localization, so a panel never
+   * carries its own list. `VITE_PANEL_LOCALE` (see `createPanelRuntimeConfig`) only
+   * preselects a locale for the first paint.
+   *
+   * Returns `null` when the project declares no locales; throws when the core cannot
+   * be asked, so those two cases stay distinguishable.
+   */
+  getLocalization(options?: PanelCallOptions): Promise<ResolvedLocalization | null> {
+    return fetchPanelLocalization({
+      apiBase: this.apiBase,
+      land: this.land,
+      colony: this.colony,
+      fetch: this.fetchImpl,
+      signal: options?.signal,
+    })
   }
 
   bootstrap(panelId: string, options?: PanelCallOptions): Promise<PanelBootstrap> {
@@ -260,7 +292,7 @@ export class PanelClient {
     options?: PanelCallOptions,
   ): Promise<T> {
     const payload = await this.request<unknown>(path, init, query, options)
-    if (!isRecord(payload) || !Object.prototype.hasOwnProperty.call(payload, 'data')) {
+    if (!isPanelRecord(payload) || !Object.prototype.hasOwnProperty.call(payload, 'data')) {
       throw new PanelError('Panel API response is missing the data envelope', {
         status: 200,
         code: 'INVALID_RESPONSE',
@@ -305,7 +337,7 @@ export class PanelClient {
       }
     }
 
-    if (!response.ok) throw responseError(response, payload, raw, url)
+    if (!response.ok) throw panelResponseError(response, payload, raw, url)
     if (response.status === 204) return undefined as T
     if (!raw.trim()) {
       throw new PanelError('Panel API returned an empty response', {
@@ -397,35 +429,4 @@ function encodeQuery(query?: QueryValues): string {
   }
   const encoded = params.toString()
   return encoded ? `?${encoded}` : ''
-}
-
-function responseError(
-  response: Response,
-  payload: unknown,
-  raw: string,
-  url: string,
-): PanelError {
-  const root = isRecord(payload) ? payload : undefined
-  const direct = root && isRecord(root.error) ? root.error : undefined
-  const nestedData = root && isRecord(root.data) ? root.data : undefined
-  const nested = nestedData && isRecord(nestedData.error) ? nestedData.error : undefined
-  const error = direct ?? nested
-  const message = stringValue(error?.message)
-    ?? stringValue(root?.message)
-    ?? stringValue(response.statusText)
-    ?? `Panel API request failed with HTTP ${response.status}`
-  return new PanelError(message, {
-    status: response.status,
-    code: stringValue(error?.code) ?? `HTTP_${response.status}`,
-    details: error ?? payload ?? raw,
-    url,
-  })
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function stringValue(value: unknown): string | undefined {
-  return typeof value === 'string' && value ? value : undefined
 }

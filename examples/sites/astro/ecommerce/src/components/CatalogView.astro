@@ -1,0 +1,215 @@
+---
+/**
+ * The catalog view: category filter, product grid, and pagination.
+ *
+ * Split out of `pages/` so both routes share one template: `/` for every product on page 1,
+ * and `/c/{category}/{page}` for a category and page combination.
+ *
+ * The reason for the routing: `getStaticPaths` can only set `params` on a route that has a
+ * dynamic segment. Written into `index.astro`, every combination collapses into one file —
+ * the build looks successful, but `/c/Sepatu/2` never exists.
+ */
+import Base from '../layouts/Base.astro'
+import {
+  categorySlug,
+  formatPrice,
+  listCategories,
+  listProducts,
+  MAX_PAGES,
+  slugify,
+} from '../lib/catalog'
+import { defaultLocale } from '../lib/hamolus'
+import type { Category } from '../lib/catalog'
+
+interface Props {
+  /** Page number, starting at 1. */
+  page: number
+  /** Category name exactly as stored in the core; empty means every category. */
+  category?: string
+  /** Categories the route already fetched, so they are not fetched a second time. */
+  categories?: Category[]
+}
+
+const { page, category, categories: presetCategories } = Astro.props
+const locale = defaultLocale
+
+const categories = presetCategories ?? (await listCategories().catch(() => ({ data: [] }))).data
+const { data: products, meta } = await listProducts({ page, category, locale })
+
+/**
+ * The path slug for one category.
+ *
+ * A category may carry its own `slug` in the core. When it does, that slug is what
+ * `getStaticPaths` builds the file with, so any link that writes a `slugify(name)` slug
+ * points at a page that is never built — a 404 with no clear reason. That is why every link
+ * resolves out of the same category list, never out of the name.
+ */
+const categoryPathFor = (targetCategory?: string): string => {
+  if (!targetCategory) return ''
+  const entry = categories.find((item) => item.name === targetCategory)
+  return entry ? categorySlug(entry) : slugify(targetCategory)
+}
+
+/**
+ * The URL for one page.
+ *
+ * Without a category, page 1 uses `/` so there are never two URLs for the same content.
+ * With a category, the path is `/c/{slug}/{page}`; page 1 is not dropped, so the URL shape
+ * stays consistent and no link needs a second rule.
+ */
+const pageUrl = (targetPage: number, targetCategory?: string): string => {
+  if (!targetCategory) return '/'
+  return `/c/${categoryPathFor(targetCategory)}/${targetPage}/`
+}
+
+/** Like `pageUrl`, but from a category object that carries its own slug. */
+const categoryPathUrl = (entry: Category): string => `/c/${categorySlug(entry)}/1/`
+
+/** Category filter link: always back to page 1 of that category. */
+const categoryUrl = (targetCategory?: string): string => pageUrl(1, targetCategory)
+
+/**
+ * The last page that is actually built.
+ *
+ * `meta.totalPages` comes from the core and can be larger than `MAX_PAGES` — the build only
+ * produces pages up to that cap. Pagination has to follow the number that was built, not
+ * the core's number: a link to a page outside the build is a 404 that is hard for a reader
+ * to make sense of.
+ */
+const lastPage = Math.min(meta.totalPages, MAX_PAGES)
+
+/** True when the core has more pages that are deliberately left unbuilt. */
+const truncated = meta.totalPages > lastPage
+---
+
+<Base
+  title={category ? `Catalog ${category} — Hamolus Store` : 'Catalog — Hamolus Store'}
+  description="An example Astro catalog filtered from the Hamolus core."
+>
+  <h1>Catalog</h1>
+
+  <nav aria-label="Category filter">
+    <a href={categoryUrl()} aria-current={category ? undefined : 'page'}>All</a>
+    {
+      categories.map((entry) => (
+        <a
+          href={categoryPathUrl(entry)}
+          aria-current={category === entry.name ? 'page' : undefined}
+        >
+          {entry.name}
+        </a>
+      ))
+    }
+  </nav>
+
+  <p class="meta">
+    {meta.total} products
+    {category && <> · category {category}</>}
+    {' · '}
+    page {meta.page} of {lastPage}
+    {
+      truncated && (
+        <> · the core has {meta.totalPages} pages, only the first {MAX_PAGES} are built</>
+      )
+    }
+  </p>
+
+  {
+    products.length === 0 ? (
+      <p>No products match this filter.</p>
+    ) : (
+      <ul class="grid">
+        {products.map((product) => (
+          <li>
+            {product.image && <img src={product.image} alt="" width="320" height="200" loading="lazy" />}
+            <h2>{product.name}</h2>
+            <p class="price">{formatPrice(product.price, locale)}</p>
+            <p class="meta">
+              {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+            </p>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  <nav aria-label="Pagination" class="pagination">
+    {
+      page > 1 ? (
+        <a href={pageUrl(page - 1, category)}>Previous</a>
+      ) : (
+        <span>Previous</span>
+      )
+    }
+    <span>
+      {page} / {meta.totalPages}
+    </span>
+    {
+      page < lastPage ? (
+        <a href={pageUrl(page + 1, category)}>Next</a>
+      ) : (
+        <span>Next</span>
+      )
+    }
+  </nav>
+
+  <p class="meta">
+    Free-form search (<code>?q=</code>), a price bound (<code>?maxPrice=</code>), and
+    <code>?inStock=1</code> have no static pages: the number of combinations is unbounded,
+    so it cannot be known at build time. The options are in the README.
+  </p>
+</Base>
+
+<style>
+  nav[aria-label='Category filter'] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  nav[aria-label='Category filter'] a[aria-current='page'] {
+    font-weight: 700;
+    text-decoration: underline;
+  }
+
+  .grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    list-style: none;
+    padding: 0;
+  }
+
+  .grid h2 {
+    font-size: 1rem;
+    margin: 8px 0 4px;
+  }
+
+  .grid img {
+    border-radius: 8px;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .price {
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .meta {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .pagination {
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    margin-top: 32px;
+  }
+
+  .pagination span {
+    color: var(--muted);
+  }
+</style>

@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { and, desc, eq, like, or, sql, type SQL } from 'drizzle-orm'
 import type { FileKind, FileObject, FilePatch, MediaTaxonomy } from '@hamolus/types'
 import { buildPaginationMeta, type PaginationMeta } from '@hamolus/types'

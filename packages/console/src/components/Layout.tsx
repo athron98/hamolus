@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { A, useLocation, useNavigate } from '@solidjs/router'
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import * as stylex from '@stylexjs/stylex'
@@ -7,7 +17,7 @@ import { buildGroupTree } from '@hamolus/types'
 import type { ConsolePlugin } from '../plugins/types'
 import { s, tokens } from '../theme.stylex'
 import { useCollections } from '../hooks/collections'
-import { PLUGINS, pluginById } from '../plugins/registry'
+import { pluginById, plugins } from '../plugins/registry'
 import { useGroups } from '../hooks/groups'
 import { usePanels } from '../hooks/panels'
 import { activeEndpoint, addEndpoint, activeUrl, endpoints, removeEndpoint, renameEndpoint, setEndpoint, storeToken } from '../lib/store'
@@ -26,6 +36,7 @@ import {
 } from '../lib/prefs'
 import { locale, setLocale } from '../lib/locale'
 import { api } from '../lib/api'
+import { useLocalization } from '../hooks/localization'
 import {
   BracesIcon,
   CheckIcon,
@@ -1046,7 +1057,7 @@ export function Layout(props: { children?: JSX.Element }) {
   const [sideOpen, setSideOpen] = createSignal(false)
   const [navOpen, setNavOpen] = createSignal(false)
   const [navPeek, setNavPeek] = createSignal(false)
-  const [languages, setLanguages] = createSignal<string[]>([])
+  const localization = useLocalization()
   const [counts, setCounts] = createSignal<Record<string, number>>({})
   const [desktop, setDesktop] = createSignal<boolean>(false)
   const [userOpen, setUserOpen] = createSignal(false)
@@ -1073,19 +1084,6 @@ export function Layout(props: { children?: JSX.Element }) {
   }
 
   onMount(async () => {
-    try {
-      const { data } = await api.getSettings()
-      const loc = data.localization
-      if (loc && typeof loc === 'object' && 'languages' in loc) {
-        const langs = (loc as Record<string, unknown>).languages
-        if (Array.isArray(langs) && langs.every((l) => typeof l === 'string')) {
-          setLanguages(langs as string[])
-          if (!langs.includes(locale())) setLocale(langs[0] as string)
-        }
-      }
-    } catch {
-      /* ignore */
-    }
     try {
       const { data } = await api.getStats()
       setCounts(Object.fromEntries(data.perCollection.map((c) => [c.name, c.count])))
@@ -1478,12 +1476,12 @@ export function Layout(props: { children?: JSX.Element }) {
           </div>
 
           <div {...stylex.props(styles.popAnchor)}>
-            <Show when={localeOpen() && languages().length > 1}>
+            <Show when={localeOpen() && localization.multilingual()}>
               <div {...stylex.props(styles.overlay)} onClick={() => setLocaleOpen(false)} />
               <div {...stylex.props(styles.popover)} role="dialog" aria-label="Locale selector">
                 <div {...stylex.props(styles.popoverTitle)}>Language</div>
                 <div {...stylex.props(styles.seg)}>
-                  <For each={languages()}>
+                  <For each={localization.languages()}>
                     {(lang) => (
                       <button
                         type="button"
@@ -1491,6 +1489,7 @@ export function Layout(props: { children?: JSX.Element }) {
                           setLocale(lang)
                           setLocaleOpen(false)
                         }}
+                        title={localization.labels()[lang] ?? lang}
                         {...stylex.props(styles.segBtn, locale() === lang && styles.segActive)}
                       >
                         {lang.toUpperCase()}
@@ -1500,7 +1499,7 @@ export function Layout(props: { children?: JSX.Element }) {
                 </div>
               </div>
             </Show>
-            <Show when={languages().length > 1}>
+            <Show when={localization.multilingual()}>
               <button
                 type="button"
                 onClick={() => setLocaleOpen((o) => !o)}
@@ -1844,7 +1843,7 @@ export function Layout(props: { children?: JSX.Element }) {
           <BuiltinGroup
             id={PLUGINS_GROUP}
             label="Plugins"
-            count={PLUGINS.length}
+            count={plugins().length}
             collapsed={collapsed}
             toggleGroup={toggleGroup}
             navMode={navMode}
@@ -1864,7 +1863,7 @@ export function Layout(props: { children?: JSX.Element }) {
                     All plugins
                   </span>
                 </A>
-                <For each={PLUGINS}>
+                <For each={plugins()}>
                   {(p) => (
                     <div {...stylex.props(styles.pluginRow)}>
                       <A

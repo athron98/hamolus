@@ -2,35 +2,52 @@
   "name": "@hamolus/plugin-console-kanban",
   "version": "0.1.0",
   "type": "module",
-  "main": "./src/index.tsx",
-  "types": "./src/index.tsx",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.tsx",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@hamolus/plugin-console-contracts": "workspace:*"
+    "@hamolus/plugin-console-contracts": "workspace:*",
+    "solid-js": "^1.9.15"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "build": "tsc --noEmit && vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "dev": "vite build --config vite.lib.config.ts --watch",
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm build && node ../../../cli/scripts/copy-license.mjs"
   },
   "license": "MIT",
+  "author": "Gilang Albathin Nurhabibi <https://github.com/athron98>",
+  "homepage": "https://github.com/hamolus-labs/hamolus/tree/main/packages/plugins/console/kanban#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamolus-labs/hamolus.git",
+    "directory": "packages/plugins/console/kanban"
+  },
+  "bugs": {
+    "url": "https://github.com/hamolus-labs/hamolus/issues"
+  },
   "description": "Drag-and-drop kanban board plugin for the Hamolus console.",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/*.css"
+  ],
   "files": [
-    "src",
+    "dist",
     "LICENSE",
     "README.md"
   ],
-  "peerDependencies": {
-    "@stylexjs/stylex": "^0.19.1",
-    "solid-js": "^1.9.15"
-  },
   "devDependencies": {
     "@stylexjs/stylex": "^0.19.1",
+    "@stylexjs/unplugin": "^0.19.1",
     "solid-js": "^1.9.15",
-    "tsup": "^8.5.0",
-    "typescript": "~5.9.0"
+    "typescript": "~5.9.0",
+    "vite": "^8.3.0",
+    "vite-plugin-solid": "^2.11.14"
   },
   "publishConfig": {
     "access": "public"

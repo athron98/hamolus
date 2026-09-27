@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 /**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ *
  * `_meta_panels` scope-migration regression check.
  *
  * Why this exists: `putPanel()` upserts with `ON CONFLICT (land, colony, id)`.

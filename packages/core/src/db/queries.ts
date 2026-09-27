@@ -1,9 +1,19 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { sql, type SQL } from 'drizzle-orm'
 import type { CollectionDefinition, FieldDefinition, FilterMap } from '@hamolus/types'
 import type { Db } from './client'
 import { auditColumns, dataFields, isIdentifier, physicalTableName, pkField, quoteIdentifier } from './table'
 import { fromDbValue, toDbValue } from './coerce'
-import { formatPriceDisplay } from '@hamolus/types'
+import { toCustomCurrencyValue, toMoneyValue } from '@hamolus/types'
 import { badRequest, forbidden, notFound } from '../errors'
 
 export interface ListOptions {
@@ -181,8 +191,14 @@ export function serializeRow(
         val = obj[locale] ?? obj[Object.keys(obj)[0]] ?? null
       }
     }
-    if (field.type === 'price' && typeof val === 'number') {
-      out[field.name] = { base: val, display: formatPriceDisplay(val, locale) }
+    // A money field is stored as a bare amount; the read shape carries the code
+    // (or the custom symbol) and the display string for the requested locale.
+    if (field.type === 'currency' && typeof val === 'number') {
+      out[field.name] = toMoneyValue(val, field.currency, locale)
+      continue
+    }
+    if (field.type === 'custom_currency' && typeof val === 'number') {
+      out[field.name] = toCustomCurrencyValue(val, field.customCurrency, locale)
       continue
     }
     out[field.name] = val

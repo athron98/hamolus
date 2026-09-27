@@ -20,6 +20,28 @@ workflow.
 | [MCP server](../packages/mcp/docs/mcp.md) | env, tools, running, wiring into an agent |
 | [Deploying](./deploying.md) | resources, secrets, configurations, console/panel deploys |
 
+### Definitions
+
+The four things you can define, and where each one lives. Start here if you are
+not sure which document you want.
+
+| Document | Declares |
+| -------- | -------- |
+| [Collection definition](./definitions/collection-definition.md) | the fields of one table |
+| [Field definition](./definitions/field-definition.md) | one column of a collection |
+| [Panel definition](./definitions/panel-definition.md) | an app surface: views, metrics, access |
+| [Config definition](./definitions/config-definition.md) | project settings: locales, uploads, theme |
+
+[Definitions index](./definitions/README.md) — the four side by side, and why
+three of them are database rows while one is a file.
+
+### Contributing
+
+| Document | Covers |
+| -------- | ------ |
+| [Contributing](../CONTRIBUTING.md) | the workflow, the gates, compatibility, and the private security channel |
+| [Writing guide](./writing-guide.md) | prose and code conventions for this repo |
+
 ## Repository layout
 
 ```
@@ -52,10 +74,34 @@ docs/                this documentation set
 pnpm install
 pnpm typecheck                 # every package
 pnpm build                     # every package
+pnpm check:markers             # template token + theme-script drift gate (offline, fast)
 pnpm check:workspace-glob      # workspace/glob regression gate
+pnpm check:copyright           # copyright/author notice on every published file
+pnpm check:generated-app       # generate → install → typecheck → build a real project
+pnpm check:code-definitions    # offline gate for code-defined collections/panels
+pnpm check:code-defined-core   # the same contract over HTTP (needs a generated core)
 pnpm check:panel-acl           # live panel ACL gate (needs a running core)
 pnpm check:scope-colony-resolution
 ```
+
+`check:markers` and `check:generated-app` answer different questions and both
+matter: the marker gate proves the template *copy* is faithful (no unsupplied
+`{{TOKEN}}`, every token present, the console's pre-paint theme script byte-matches
+the one shipped in the console), while `check:generated-app` proves the copied files
+form an app that installs, typechecks and builds — which is where a generated
+console can fail, because it consumes `@hamolus/console` as a pre-built library
+rather than vendoring the UI. The slow gate needs a warm pnpm store and
+`pnpm -F @hamolus/console build:lib`.
+
+`check:code-definitions` and `check:code-defined-core` split one contract in two.
+The first needs no Worker: it loads the definition registry in-process and
+asserts boot-time validation, duplicate detection, the guard helpers, and that a
+failed write leaves the previous definitions standing. The second needs a core
+built from the `predefined` template (`hamolus create acme --core predefined`),
+and asserts what only a running Worker can show — the `posts` collection and
+`content` panel are served straight after start with their declared fields,
+`PUT`/`DELETE` on them are refused with `403`, records inside them stay editable,
+and a land registered later comes up with the same baseline.
 
 Run the CLI from source with `pnpm hamolus -- <args>`, e.g.
 
@@ -75,6 +121,13 @@ pnpm hamolus -- create acme --link . --output /tmp/acme
 `templates/` is the single source of truth for generated files. `packages/cli`
 copies it into `packages/cli/templates` on `prepack`, so a published CLI ships the
 same content that the repository develops against. Edit `templates/`, never the copy.
+
+A part is generated from a named directory under its kind (`cores/basic`,
+`panels/basic`, …), and `--template <path>` overrides the name with a directory of
+your own. Cores have two templates: `basic` ships no collections or panels, while
+`predefined` ships a `posts` collection and a `content` panel under `core/src/`,
+declared in source control and therefore frozen against API edits. Pick it with
+`hamolus create <name> --core predefined`.
 
 ## Local development
 

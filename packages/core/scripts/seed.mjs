@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 // Comprehensive demo seed for Hamolus.
 // Implements every feature: 15 field types, relations (belongsTo/hasMany/hasOne),
 // localization, richtext + media fields, R2 media library with taxonomy & focus

@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 /**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ *
  * Sample Panel seed — creates a set of demo Panels against the collections that
  * exist in the target scope, plus one `panel_user` account per Panel so the
  * runtime (manifest-as-ACL) path can actually be exercised.

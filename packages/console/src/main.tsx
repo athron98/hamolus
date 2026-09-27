@@ -1,53 +1,19 @@
-import { render } from 'solid-js/web'
-import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import { Route, Router } from '@solidjs/router'
-import { App } from './App'
-import { DashboardPage } from './pages/Dashboard'
-import { CollectionsPage } from './pages/Collections'
-import { CollectionPage } from './pages/CollectionPage'
-import { MediaPage } from './pages/Media'
-import { DocumentsPage } from './pages/Documents'
-import AttachmentsPage from './pages/AttachmentsPage'
-import { UsersPage } from './pages/Users'
-import { ConfigPage } from './pages/Config'
-import { UniversePage } from './pages/Universe'
-import { SeedPage } from './pages/Seed'
-import { PluginsPage } from './pages/Plugins'
-import { PluginPage } from './pages/PluginPage'
-import { PanelsPage } from './pages/Panels'
-import { PanelDetailPage } from './pages/PanelDetail'
-import './index.css'
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ *
+ * Development entry for the console package itself.
+ *
+ * `src/lib.tsx` is the real entry — it exports `mount()` for host applications and
+ * this file is only the stock shell that calls it, so the dev server, the preview
+ * build and a generated project all exercise the same code path.
+ */
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-})
+import { mount } from './lib'
 
-render(
-  () => (
-    <QueryClientProvider client={queryClient}>
-      <Router root={(props) => <App>{props.children}</App>}>
-        <Route path="/" component={DashboardPage} />
-        <Route path="/collections" component={CollectionsPage} />
-        <Route path="/media" component={MediaPage} />
-        <Route path="/documents" component={DocumentsPage} />
-        <Route path="/attachments" component={AttachmentsPage} />
-        <Route path="/users" component={UsersPage} />
-        <Route path="/config" component={ConfigPage} />
-        <Route path="/universe" component={UniversePage} />
-        <Route path="/seed" component={SeedPage} />
-        <Route path="/plugins" component={PluginsPage} />
-        <Route path="/plugins/:name" component={PluginPage} />
-        <Route path="/panels" component={PanelsPage} />
-        <Route path="/panels/:id" component={PanelDetailPage} />
-        <Route path="/collections/:collection" component={CollectionPage} />
-      </Router>
-    </QueryClientProvider>
-  ),
-  document.getElementById('root')!,
-)
+mount()

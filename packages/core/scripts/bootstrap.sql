@@ -1,3 +1,12 @@
+--
+-- Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+--
+-- Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+--
+-- SPDX-License-Identifier: MIT
+--
+-- Licensed under the MIT License. See the LICENSE file at the repository root.
+
 -- Bootstrap tabel metadata definisi koleksi (manual, opsional).
 -- Runtime juga bikin otomatis (CREATE TABLE IF NOT EXISTS) di meta/store.ts.
 CREATE TABLE IF NOT EXISTS _meta_collections (

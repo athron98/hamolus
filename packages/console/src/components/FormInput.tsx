@@ -1,7 +1,22 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { createSignal, For, Show } from 'solid-js'
 import * as stylex from '@stylexjs/stylex'
 import type { FieldDefinition } from '@hamolus/types'
-import { formatPriceDisplay, type ControlType } from '@hamolus/types'
+import {
+  DEFAULT_CURRENCY,
+  formatCurrencyDisplay,
+  formatCustomCurrencyDisplay,
+  type ControlType,
+} from '@hamolus/types'
 import { s, tokens } from '../theme.stylex'
 import { useRelationContext, type RelationOption } from '../lib/relations'
 import { LexicalEditor, type LexicalValue } from './LexicalEditor'
@@ -321,12 +336,20 @@ function RelationSelect(props: {
   )
 }
 
-function PriceInput(props: {
+/**
+ * Amount input for `currency` and `custom_currency`. The field stores a bare
+ * number, so the widget edits the number and previews the formatted string the
+ * API will hand back — the same string, from the same formatter, so the console
+ * never has to reimplement the locale rules.
+ */
+function CurrencyInput(props: {
   field: FieldDefinition
   value: () => unknown
   onChange: (value: unknown) => void
   locale?: string
 }) {
+  const custom = () => props.field.type === 'custom_currency'
+  const code = () => props.field.currency ?? DEFAULT_CURRENCY
   const base = () => {
     const v = props.value()
     if (v == null) return ''
@@ -335,8 +358,15 @@ function PriceInput(props: {
   }
   const display = () => {
     const n = Number(base())
-    return Number.isFinite(n) && n !== 0 ? formatPriceDisplay(n, props.locale) : ''
+    if (!Number.isFinite(n) || n === 0) return ''
+    return custom()
+      ? formatCustomCurrencyDisplay(n, props.field.customCurrency, props.locale)
+      : formatCurrencyDisplay(n, { code: code(), locale: props.locale })
   }
+  const hint = () =>
+    custom()
+      ? 'Custom unit — the symbol and separators come from the field\'s customCurrency'
+      : `Amount in ${code()} (e.g. 250000 → ${formatCurrencyDisplay(250000, { code: code(), locale: props.locale })})`
   return (
     <>
       <input
@@ -352,7 +382,7 @@ function PriceInput(props: {
         }}
       />
       <div {...stylex.props(styles.help)}>
-        {display() ? `≈ ${display()} (${props.locale ?? 'id'})` : 'IDR base in rupiah (e.g. 100000 → 100K)'}
+        {display() ? `${display()} · ${props.locale ?? 'id'}` : hint()}
         {props.field.min !== undefined && ` · min ${props.field.min}`}
         {props.field.max !== undefined && ` · max ${props.field.max}`}
       </div>
@@ -759,8 +789,8 @@ export function FormInput(props: {
             onChange(v === '' ? null : Number(v))
           }}
         />
-      ) : fieldType === 'price' ? (
-        <PriceInput field={field} value={value} onChange={onChange} locale={props.locale} />
+      ) : fieldType === 'currency' || fieldType === 'custom_currency' ? (
+        <CurrencyInput field={field} value={value} onChange={onChange} locale={props.locale} />
       ) : fieldType === 'date' ? (
         <input
           type="date"

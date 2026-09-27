@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { and, eq, sql } from 'drizzle-orm'
 import type {
   CollectionDefinition,
@@ -320,7 +330,7 @@ async function validatePanelReferences(
         const collection = await getCollection(db, metric.collection, land, colony)
         if (metric.field) {
           const field = assertFieldExists(collection, metric.field, panel.id, `metric '${metric.id}'`)
-          if (metric.operation !== 'count' && !['number', 'price'].includes(field.type)) {
+          if (metric.operation !== 'count' && !['number', 'currency', 'custom_currency'].includes(field.type)) {
             throw badRequest(`Metric '${metric.id}' requires a numeric field`, 'PANEL_REFERENCE_INVALID')
           }
         }

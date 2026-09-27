@@ -1,0 +1,23 @@
+{
+  "name": "hamolus-example-panel-inventory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Example Hamolus panel: warehouse stock — read, adjust stock, optimistic update.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hamolus/panel": "^0.1.0",
+    "solid-js": "^1.9.15"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.0",
+    "vite": "^8.3.0",
+    "vite-plugin-solid": "^2.11.14"
+  }
+}

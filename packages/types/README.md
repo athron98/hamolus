@@ -28,7 +28,7 @@ src/panel.ts        panel manifest contracts
 src/group.ts        navigation groups
 src/auth.ts         users, privileges, sessions
 src/scope.ts        lands, colonies, tenant scope
-src/price.ts        money formatting
+src/currency.ts     money types + formatting
 src/markdown.ts     markdown → HTML/plain text
 ```
 

@@ -1,3 +1,4 @@
+// Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>, MIT
 import { render } from 'solid-js/web'
 import { App } from './App'
 import { panel } from './panel'

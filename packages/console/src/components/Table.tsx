@@ -1,7 +1,22 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import * as stylex from '@stylexjs/stylex'
 import type { CollectionDefinition, FieldDefinition, SortDir } from '@hamolus/types'
-import { formatPriceDisplay, markdownToPlainText } from '@hamolus/types'
+import {
+  DEFAULT_CURRENCY,
+  formatCurrencyDisplay,
+  formatCustomCurrencyDisplay,
+  markdownToPlainText,
+} from '@hamolus/types'
 import { s, tokens } from '../theme.stylex'
 import type { RecordRow } from '../hooks/records'
 import { useRelationLabelMaps } from '../lib/relations'
@@ -553,9 +568,14 @@ function CellValue(props: {
       return <span {...stylex.props(styles.mono)}>{String(value)}</span>
     case 'number':
       return <span {...stylex.props(styles.mono)}>{String(value)}</span>
-    case 'price': {
+    case 'currency':
+    case 'custom_currency': {
       const obj = value && typeof value === 'object' ? (value as { base?: number; display?: string }) : null
-      const display = obj?.display || (typeof value === 'number' ? formatPriceDisplay(value, props.locale) : '')
+      const display = obj?.display || (typeof value === 'number'
+        ? field.type === 'custom_currency'
+          ? formatCustomCurrencyDisplay(value, field.customCurrency, props.locale)
+          : formatCurrencyDisplay(value, { code: field.currency ?? DEFAULT_CURRENCY, locale: props.locale })
+        : '')
       return <span {...stylex.props(styles.mono)} title={obj ? `base ${obj.base}` : undefined}>{display}</span>
     }
     case 'json':

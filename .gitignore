@@ -8,6 +8,10 @@ build/
 .astro/
 .next/
 out/
+# The console's library build (vite.lib.config.ts -> outDir), consumed by generated
+# consoles and by packages/console/package.json's main/types. Build it with
+# `pnpm -F @hamolus/console build:lib`; never commit the bundle.
+packages/console/dist-lib/
 
 # Tooling caches
 .turbo/
@@ -46,3 +50,10 @@ examples/private/
 
 # Copied into the CLI package at pack time (see packages/cli/scripts/copy-templates.mjs)
 packages/cli/templates/
+
+# Copied into every published package at pack time (see packages/cli/scripts/copy-license.mjs).
+# Nine committed copies would be nine files to keep in step with the root by hand.
+packages/*/LICENSE
+packages/plugins/*/*/LICENSE
+
+.opencode/

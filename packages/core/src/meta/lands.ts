@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { sql } from 'drizzle-orm'
 import type { ColonyDefinitionInput, ColonyDto, LandDefinitionInput, LandDto } from '@hamolus/types'
 import { COLONY_DEFAULT, COLONY_SUFFIX, FILE_KINDS, LAND_DEFAULT, LAND_SUFFIX, TABLE_SEP, colonyDefinitionSchema, landDefinitionSchema } from '@hamolus/types'

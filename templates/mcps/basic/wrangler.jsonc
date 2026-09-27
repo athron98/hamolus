@@ -1,0 +1,35 @@
+{
+  // Worker name + entry point
+  //
+  // `main` points at the local seam in src/index.ts, which re-exports the server from
+  // @hamolus/mcp. Edit that file to wrap it; you never need to fork the package.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "{{PROJECT_SLUG}}-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The MCP server binds no D1/KV/R2: it is a stateless proxy that turns the core API
+  // into MCP tools, so it has nothing to store and nothing to migrate.
+  "vars": {
+    // Base URL of the core API (must end with /api). Point it at your deployed core:
+    //   local  -> http://localhost:8787/api
+    //   online -> https://{{PROJECT_SLUG}}-core.<your-account>.workers.dev/api
+    "CORE_API_URL": "http://localhost:8787/api",
+
+    // Optional scope: land/colony sent as x-land / x-colony on every core request.
+    // Leave empty for the default land (single-tenant core).
+    "CORE_LAND": "",
+    "CORE_COLONY": "",
+
+    // "true" disables every write/mutation tool — useful for a read-only agent.
+    "MCP_READONLY": "false"
+  }
+
+  // Credentials are SECRETS, never vars — a secret and a var cannot share a name.
+  //   wrangler secret put CORE_API_TOKEN     -- Bearer JWT used against the core.
+  //                                             When unset, CORE_ADMIN_KEY mints one.
+  //   wrangler secret put CORE_ADMIN_KEY     -- admin key that mints a JWT at startup.
+  //   wrangler secret put MCP_BEARER_TOKEN   -- when set, POST /mcp requires
+  //                                             `Authorization: Bearer <token>`.
+}

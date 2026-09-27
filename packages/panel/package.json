@@ -45,7 +45,9 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:runtime": "node scripts/check-runtime.mjs",
+    "prepack": "node ../cli/scripts/copy-license.mjs"
   },
   "dependencies": {
     "@hamolus/types": "workspace:*"

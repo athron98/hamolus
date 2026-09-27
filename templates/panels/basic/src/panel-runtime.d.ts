@@ -1,3 +1,4 @@
+// Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>, MIT
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {

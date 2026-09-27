@@ -1,6 +1,10 @@
 /**
  * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
  *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
  * Licensed under the MIT License. See the LICENSE file at the repository root.
  *
  * Resolution of *source packages*.
@@ -202,6 +206,17 @@ export async function resolveWorkspaceDependencyVersion(
 }
 
 /**
+ * The version range to use for an `@hamolus/*` package whose real version is unknown.
+ *
+ * The monorepo is still pre-release, so a generated project can ask for a version the
+ * registry does not have yet. `^0.1.0` matches what the console template declares and
+ * keeps such a project installable, whereas `*` would silently accept any future major of
+ * an unreleased package. Shared by {@link resolveDependencyRange} and `hamolus add plugin`
+ * so both write the same range.
+ */
+export const UNPUBLISHED_VERSION_RANGE = '^0.1.0'
+
+/**
  * Rewrite a `workspace:` dependency onto a published version range.
  *
  * Generated projects live outside this monorepo, so a workspace protocol range
@@ -210,8 +225,9 @@ export async function resolveWorkspaceDependencyVersion(
  * wrong, and appending the operator to nothing (`^*`) is not even a valid range.
  *
  * `fallbackVersion` is the version discovered from the source package (see
- * {@link resolveWorkspaceDependencyVersion}); when it is missing, `0.1.0` keeps the
- * generated project installable against a package that has not been published yet.
+ * {@link resolveWorkspaceDependencyVersion}); when it is missing,
+ * {@link UNPUBLISHED_VERSION_RANGE} keeps the generated project installable against a
+ * package that has not been published yet.
  */
 export function resolveDependencyRange(
   version: string | undefined,
@@ -222,7 +238,7 @@ export function resolveDependencyRange(
 
   const operator = version.slice('workspace:'.length).trim()
   const exact = operator === '*' || operator === '^' || operator === '~' ? '' : operator
-  const resolved = exact || fallbackVersion || '0.1.0'
+  const resolved = exact || fallbackVersion || UNPUBLISHED_VERSION_RANGE.replace(/^[\^~]/, '')
 
   // `workspace:1.2.3` means "exactly this version".
   return exact ? exact : `^${resolved.replace(/^[\^~]/, '')}`

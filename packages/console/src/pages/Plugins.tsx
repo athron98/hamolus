@@ -1,8 +1,18 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { A } from '@solidjs/router'
 import { For } from 'solid-js'
 import * as stylex from '@stylexjs/stylex'
 import { s, tokens } from '../theme.stylex'
-import { PLUGINS } from '../plugins/registry'
+import { plugins } from '../plugins/registry'
 import { CollectionIcon, PuzzleIcon } from '../components/Icons'
 
 const styles = stylex.create({
@@ -70,7 +80,7 @@ export function PluginsPage() {
         Plugins
       </div>
       <div {...stylex.props(styles.grid)}>
-        <For each={PLUGINS}>
+        <For each={plugins()}>
           {(p) => (
             <A href={`/plugins/${p.id}`} {...stylex.props(styles.card)}>
               <div {...stylex.props(styles.title)}>

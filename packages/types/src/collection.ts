@@ -1,6 +1,17 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { z } from 'zod'
 import { fieldDefinitionSchema, type FieldDefinition } from './field'
 import { fileRefValueSchema, mediaFieldValueSchema } from './dto'
+import { customCurrencyValueSchema, moneyValueSchema } from './currency'
 
 export interface CollectionDefinition {
   /** Collection name = D1 table name, must be snake_case */
@@ -91,16 +102,15 @@ export function fieldValueSchema(field: FieldDefinition, languages?: string[]): 
       base = required ? s : s.optional().nullable()
       break
     }
-    case 'price': {
-      // Accept either the raw IDR base (number) or a serialized display
-      // object `{ base, display }` (round-tripped through the API).
+    case 'currency':
+    case 'custom_currency': {
+      // Accept the raw amount (number) or the serialized read shape, so a value
+      // that came out of a GET can be written straight back. Only the amount is
+      // stored; the display string is derived per read.
       let num = z.number({ message: 'Must be a number' })
       if (field.min !== undefined) num = num.gte(field.min)
       if (field.max !== undefined) num = num.lte(field.max)
-      const obj = z
-        .object({ base: num, display: z.string() })
-        .strict()
-      const s = z.union([num, obj])
+      const s = z.union([num, moneyValueSchema, customCurrencyValueSchema])
       base = required ? s : s.optional().nullable()
       break
     }

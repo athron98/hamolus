@@ -1,3 +1,4 @@
+// Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>, MIT
 // {{SEED_NAME}} — a self-cleaning seed for a Hamolus core.
 //
 // Seeds are plain Node scripts: no build step, no dependencies, just fetch. This

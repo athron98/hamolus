@@ -1,0 +1,64 @@
+---
+import Base from '../../layouts/Base.astro'
+import { effectiveLocales, getCompanyProfile } from '../../lib/company'
+
+/**
+ * The "about" page, per locale.
+ *
+ * Shows one record fetched once per language rather than once per team member. If the
+ * profile is missing, the page still builds with a clear fallback — which beats a build
+ * failing over one unfilled collection row.
+ */
+
+export async function getStaticPaths() {
+  const { defaultLocale: fallback, locales } = await effectiveLocales()
+  return locales.map((entry) => ({
+    params: { locale: entry.code },
+    props: { locale: entry.code, fallback, locales },
+  }))
+}
+
+const { locale, fallback, locales } = Astro.props
+
+let tagline = ''
+let about = ''
+try {
+  const profile = await getCompanyProfile(locale)
+  tagline = profile?.tagline ?? ''
+  about = profile?.about ?? ''
+} catch {
+  // Leave it empty; the copy below tells the reader the data is not there yet.
+}
+---
+
+<Base
+  title={`About us (${locale})`}
+  description="The company profile from the Hamolus core."
+  lang={locale}
+  locales={locales}
+>
+  <p>
+    <a href={`/${locale}/`}>← Home ({locale})</a>
+  </p>
+  {locale !== fallback && <p><a href={`/${fallback}/about/`}>Open the {fallback} version</a></p>}
+
+  <h1>About us</h1>
+  {
+    about ? (
+      <>
+        {tagline && <p class="meta">{tagline}</p>}
+        <p>{about}</p>
+      </>
+    ) : (
+      <p>
+        The <code>companies</code> collection is still empty in the core, so there is no
+        profile to show for this locale.
+      </p>
+    )
+  }
+
+  <p>
+    The people pages are in <code>[locale]/people/[slug].astro</code>, built as one URL per
+    team member per language.
+  </p>
+</Base>

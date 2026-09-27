@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
@@ -33,6 +43,7 @@ import { getSuperRowById } from '../auth/super'
 import { getUserRowById } from '../auth/users'
 import { createDb, type Db } from '../db/client'
 import { pkField, physicalTableName, quoteIdentifier } from '../db/table'
+import { effectiveLocaleCodes } from '../config'
 import {
   buildScopedWhereClause,
   createRecord,
@@ -49,6 +60,7 @@ import { badRequest, forbidden, HttpError, notFound, unauthorized } from '../err
 import { deletePanel, getPanel, listPanels, putPanel } from '../meta/panels'
 import { getSettings } from '../meta/settings'
 import { getCollection } from '../meta/store'
+import { isCodePanel } from '../definitions'
 import {
   createPanelAsset,
   deletePanelAsset,
@@ -127,15 +139,6 @@ function parseQuery(c: { req: { url: string } }): ReturnType<typeof panelQuerySc
     throw badRequest('Invalid query: ' + formatZodIssues(parsed.error.issues), 'INVALID_QUERY')
   }
   return parsed.data
-}
-
-function getLanguages(settings: Record<string, unknown>): string[] {
-  const localization = settings.localization
-  if (!localization || typeof localization !== 'object' || !('languages' in localization)) return []
-  const languages = (localization as Record<string, unknown>).languages
-  return Array.isArray(languages) && languages.every((language) => typeof language === 'string')
-    ? (languages as string[])
-    : []
 }
 
 function unique(values: string[]): string[] {
@@ -352,7 +355,7 @@ async function validateEntityInput(
     throw badRequest('No writable fields supplied')
   }
   const settings = await getSettings(env.SETTINGS, land)
-  const schema = buildEntitySchema(def, getLanguages(settings))
+  const schema = buildEntitySchema(def, effectiveLocaleCodes(settings))
   const parsed = (partial ? schema.partial() : schema).safeParse(input)
   if (!parsed.success) {
     throw badRequest('Validation failed: ' + formatZodIssues(parsed.error.issues), 'VALIDATION')
@@ -450,6 +453,12 @@ panelRoutes.post('/', async (c) => {
   if (!parsed.success) {
     throw badRequest('Invalid panel: ' + formatZodIssues(parsed.error.issues), 'INVALID_PANEL')
   }
+  if (isCodePanel(parsed.data.definition.id)) {
+    throw forbidden(
+      `The '${parsed.data.definition.id}' panel is declared in code (src/panels) and is read-only. Edit the file and redeploy to change it.`,
+      'CODE_DEFINED_PANEL',
+    )
+  }
   if ((await listPanels(db, scope.land, scope.colony)).some((panel) => panel.id === parsed.data.definition.id)) {
     throw new HttpError(409, 'PANEL_EXISTS', `Panel '${parsed.data.definition.id}' already exists`)
   }
@@ -470,6 +479,12 @@ async function replacePanel(c: Context<{ Bindings: Env }>, mustExist: boolean): 
   const db = createDb(c.env.DB)
   const id = parsePanelId(requiredParam(c, 'id'))
   const body = await c.req.json().catch(() => null)
+  if (isCodePanel(id)) {
+    throw forbidden(
+      `The '${id}' panel is declared in code (src/panels) and is read-only. Edit the file and redeploy to change it.`,
+      'CODE_DEFINED_PANEL',
+    )
+  }
   const parsed = panelUpdateInputSchema.safeParse(body)
   if (!parsed.success) {
     throw badRequest('Invalid panel: ' + formatZodIssues(parsed.error.issues), 'INVALID_PANEL')
@@ -490,6 +505,12 @@ panelRoutes.delete('/:id', async (c) => {
   const scope = await resolveRequestScope(c)
   const db = createDb(c.env.DB)
   const id = parsePanelId(c.req.param('id'))
+  if (isCodePanel(id)) {
+    throw forbidden(
+      `The '${id}' panel is declared in code (src/panels) and is read-only. Edit the file and redeploy to change it.`,
+      'CODE_DEFINED_PANEL',
+    )
+  }
   await getPanel(db, id, scope.land, scope.colony)
   const assets = await deletePanelAssetsForPanel(db, {
     land: scope.land,
@@ -904,7 +925,7 @@ panelRoutes.get('/:id/views/:viewId/dashboard', async (c) => {
     let metricField: FieldDefinition | undefined
     if (metric.field) {
       metricField = assertReadable(targetDef, metric.field, targetAcl)
-      if (metric.operation !== 'count' && !['number', 'price'].includes(metricField.type)) {
+      if (metric.operation !== 'count' && !['number', 'currency', 'custom_currency'].includes(metricField.type)) {
         throw forbidden(`Metric '${metric.id}' requires a numeric readable field`, 'PANEL_METRIC_FORBIDDEN')
       }
     }

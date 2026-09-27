@@ -34,6 +34,45 @@ is stored **per endpoint** (`console-token:{url}`), since each core signs its ow
 token. Switching to an endpoint without a saved token returns to login with that
 endpoint pre-selected.
 
+## Using it as a library (generated projects)
+
+`hamolus add console` does **not** copy this source. It writes an eight-file Vite
+shell (no JSX, no `vite-plugin-solid`, no StyleX compiler) that imports the console
+as a pre-built module:
+
+```ts
+// src/main.ts (generated)
+import '@hamolus/console/style.css'
+import { mount } from '@hamolus/console'
+import { config } from '../console.config'
+
+const instance = mount({ config }) // target defaults to <div id="root">
+
+// Vite HMR: replace the mounted app instead of stacking a second one on the node.
+if (import.meta.hot) import.meta.hot.dispose(() => instance.unmount())
+```
+
+`mount()` takes `{ target?, config? }` and returns `{ unmount() }`; it renders the whole
+app (router, query client, theming) and the generated entry calls `unmount()` on Vite
+HMR so a hot update swaps the app instead of stacking two copies of the console's
+`<div>`. Mounting twice into the same element returns the existing instance.
+`config` mirrors the console's own settings (API base, saved endpoints, theme, …);
+`defaultLocale` is only a fallback, because the console asks the core for the real
+list via `GET /_meta/localization`.
+
+Consequences for this package:
+
+- `src/lib.tsx` is the public entry (`mount`); `src/main.tsx` is the dev/demo entry
+  and may change freely.
+- `package.json` ships `dist-lib` (one ESM module + `.d.ts`), an explicit
+  `"./style.css"` export, and `build:lib` (`vite.lib.config.ts`) next to the dev
+  `build`. `pnpm -F @hamolus/console build:lib` is what a generated project consumes.
+- Anything a generated app can reach must be reachable from `mount()`'s types — the
+  public surface is the `ConsoleConfig` shape plus `mount`, not the internals.
+- `check:generated-app` builds a real generated console against `dist-lib`, so a
+  change that only typechecks here (e.g. a style export or a renamed prop) fails
+  that gate instead of reaching a generated project.
+
 ## Screens
 
 ### Dashboard (`/`)
@@ -206,17 +245,18 @@ configuration UI for those manifests.
 ### Plugins (`/plugins`)
 
 Console plugins are SolidJS pages shipped from separate workspace packages under
-`packages/plugins/console/` and registered in `src/plugins/registry.ts`:
+`packages/plugins/console/`, listed in the host's `console.config.ts`:
 
 - **Contracts** (`@hamolus/plugin-console-contracts`) — the `ConsolePlugin` interface
   (`id`, `name`, `description`, `icon`, `component`), the props handed to every
   plugin page (`plugin`, `kv`, `permissions`, `tools`), a `KvClient` surface
   (`list` / `get` / `set` / `del`, JSON values), and the shared StyleX theme tokens
-  + `ps` styles. The theme file must be named `index.stylex.ts` and be imported
-  **by relative `.stylex.ts` specifier** — the StyleX babel plugin only resolves
+  + `ps` styles. The theme file must be named `*.stylex.ts` and be imported
+  **by relative `.stylex.ts` specifier** — the StyleX compiler only resolves
   theme imports whose literal specifier ends in `.stylex.ts` (a bare package name
-  fails with "Could not resolve the path to the imported file"). Type-only imports
-  can stay on the package name. `allowImportingTsExtensions` is enabled in the
+  fails with "Could not resolve the path to the imported file"). It is published as
+  raw TypeScript and compiled by each *plugin's* build, never by a host. Type-only
+  imports can stay on the package name. `allowImportingTsExtensions` is enabled in the
   console tsconfig (base has `noEmit: true`).
 - **Todo list** (`/plugins/todo`) and **Kanban board** (`/plugins/kanban`) —
   self-contained demo plugins. Both persist through core `/api/_plugins` routes to
@@ -225,9 +265,42 @@ Console plugins are SolidJS pages shipped from separate workspace packages under
   through `lib/pluginKv.ts`, which reads `apiBase()`/`token()`/`land()` at every
   call so an endpoint/tenant switch keeps working. `get` returns `null` for a
   missing key (404), so a fresh land renders an empty board, not an error.
-- New plugins: add a workspace package exporting `ConsolePlugin`, alias it in
-  `vite.config.ts`, add it to the registry, and it appears under `/plugins` AND as a
-  row in the sidebar's built-in **Plugins** group with its own icon + a pin button.
+- New plugins: add a workspace package exporting a `ConsolePlugin` **descriptor**,
+  then list it in the host's `console.config.ts`:
+
+  ```ts
+  import { defineConsoleConfig } from '@hamolus/types'
+  import { todoPlugin } from '@hamolus/plugin-console-todo'
+
+  export const config = defineConsoleConfig({ plugins: [todoPlugin] })
+  ```
+
+  `mount({ config })` registers the list before the first render, so the plugin
+  appears under `/plugins` AND as a row in the sidebar's built-in **Plugins** group
+  with its own icon + a pin button. `hamolus add plugin <name>` does exactly two
+  things: declares the plugin package in the console's `package.json` and appends one
+  import plus one array element here. Config is the only place, because the console
+  ships as a Vite bundle: a registry file inside it is not a file the host owns, and
+  the host has nothing to regenerate it from.
+- **Plugin packages ship built, and a host needs nothing to consume one.** A plugin's
+  `dist/index.js` starts with `import './index.css'`, so the host's bundler picks up the
+  plugin's compiled stylesheet on its own — no `import '.../style.css'` in `src/main.ts`,
+  no `vite-plugin-solid`, no StyleX compiler in the host's `vite.config.ts`, and no
+  plugin folder to create. The compiled rules point at the console's own CSS variables
+  (`--bg`, `--surface`, `--text`, …), so overriding those still restyles the plugins.
+  `solid-js` and `solid-js/web` stay **external** in both the console and plugin builds:
+  a plugin is Solid code running inside this console's render tree, so it must share this
+  console's Solid instance. A bundled second copy would put every `createMemo` in a
+  plugin outside the console's reactive graph, where it would never be tracked.
+  `packages/cli/scripts/check-plugin-config.mjs` pins all of it, including that a
+  generated console's `console.config.ts` parses and that `hamolus add plugin` is
+  idempotent.
+- The registry is a **signal**, not a `const` array: registration happens after module
+  evaluation, so the sidebar, `/plugins`, and a pinned shortcut all read it inside
+  their own tracking scopes. A frozen array would be fixed before the host config was
+  ever read. Ids are sorted, and a duplicate id throws at mount — a shared id would
+  also mean a shared `plugin:{land}:{id}:*` prefix, so the symptom would be silently
+  interleaved data rather than a visible error.
 - **Pinning**: each plugin row's pin toggles the plugin's id in the shared
   `console-pinned` list — a pinned plugin then renders as a **navbar shortcut**
   (icon + name, styled like pinned collections). Unpin from that same row button.
@@ -363,8 +436,11 @@ are separate permissions — `lands.write` (lands + super admins) and
   endpoint **hard-reloads the page** — the new active endpoint is persisted, record
   caches are cleared, and the app boots against that core (no saved token for it →
   back to login with that endpoint pre-selected).
-- **Language switch** (globe + current language code) opens a drop-down popover if
-  the KV settings define `localization.languages` (>1 language).
+- **Language switch** (globe + current language code) opens a drop-down popover when
+  the project has more than one locale. The list comes from the core's
+  `GET /_meta/localization` — so a console never has to mirror the core's locales —
+  and the switcher is hidden when the core reports none. `console.config.ts` only
+  supplies a `defaultLocale` fallback for that case.
 - **Sidebar** dropdown (PanelLeftIcon) sets the sidebar **mode** (Expand / Icons)
   and the **Auto-hide** switch (see Sidebar above).
 - **Appearance** dropdown (single trigger, sun/moon by mode) holds four sections:
@@ -423,8 +499,9 @@ columns:
   are textareas,
   `date`/`datetime` use native pickers, `boolean` is a checkbox, `media` fields
   show a thumbnail preview with **Choose / Replace / Remove** buttons that open the
-  media-picker overlay (searchable, paginated grid), and `price` fields are a number
-  input (locale-aware readout) storing the raw IDR amount. `media` previews apply
+  media-picker overlay (searchable, paginated grid), and `currency` /
+  `custom_currency` fields are a number input (locale-aware readout) storing the
+  raw amount. `media` previews apply
   the snapshot's **focus point** (`object-position`) when one was recorded, and
   table media cells do the same.
 - **Per-field input widgets** (via the field's `control`, see `packages/core/docs/api.md`):

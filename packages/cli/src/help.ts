@@ -1,6 +1,10 @@
 /**
  * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
  *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
  * Licensed under the MIT License. See the LICENSE file at the repository root.
  */
 
@@ -37,6 +41,7 @@ export function usage(): string {
     'Common options:',
     '  -o, --output <path>     Write to an explicit path instead of the project default',
     '      --mode <mode>      Core mode for `create`: independent | centralized | proxy | bridge',
+    '      --core <name>      Core template for `create`: basic (no schema) | predefined',
     '      --template <path>  Use an explicit template directory (skips resolution)',
     '      --source <path>    Use an explicit source directory (skips package resolution)',
     '      --package <name>   Use a specific published package version as the source',
@@ -50,6 +55,7 @@ export function usage(): string {
     'Examples:',
     `  ${CLI_NAME} create acme`,
     `  ${CLI_NAME} create acme --mode centralized`,
+    `  ${CLI_NAME} create acme --core predefined   # a collection + panel in source control`,
     `  ${CLI_NAME} add console`,
     `  ${CLI_NAME} add panel shop_ops`,
     `  ${CLI_NAME} add mcp`,
@@ -68,9 +74,17 @@ export function commandHelp(command: 'create' | 'add' | 'link'): string {
       'a workspace manifest and a `hamolus.json` project file. Additional parts are',
       'added afterwards with `hamolus add`.',
       '',
+      'The core comes from a named template. `basic` ships no schema — collections',
+      'and panels are created in the console or the API and stay editable there.',
+      '`predefined` ships one of each under `core/src/`, defined in source control',
+      'and therefore frozen against API edits (its records stay editable).',
+      '',
       'Options:',
       '      --mode <mode>      Core mode (default: independent)',
       `                          ${CORE_MODES.join(' | ')}`,
+      '      --core <name>      Core template (default: the mode\'s, then basic)',
+      '                          basic     no collections or panels',
+      '                          predefined a posts collection + content panel in src/',
       '  -o, --output <path>     Output directory (default: ./<name>)',
       '      --link <path>      Link @hamolus/* into a local checkout (skips the registry)',
       '      --force            Overwrite an existing directory',

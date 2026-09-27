@@ -1,16 +1,31 @@
 /**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ *
  * Shared design tokens and base styles for Hamolus console plugins.
  *
  * Imported as `@hamolus/plugin-console-contracts/styles.stylex.ts`. The `.stylex.ts`
  * extension in the specifier is required, not decorative: the StyleX compiler
  * only transforms a theme module whose own file is named `*.stylex.ts`, and it
- * deopts before resolution on a bare specifier. For the same reason this file is
- * published as raw TypeScript rather than built to `dist` — the tokens must be
- * compiled by the *consuming* app so its palette CSS variables are emitted and the
- * class names line up with the host's build.
+ * deopts before resolution on a bare specifier.
+ *
+ * This file is published as raw TypeScript rather than built to `dist`, and is
+ * compiled by each *plugin's* build rather than by a host's. A plugin is built once,
+ * here, and ships as JavaScript plus a stylesheet; a host adds it to `console.config.ts`
+ * and never runs a StyleX compiler. The tokens survive that arrangement because they
+ * resolve to the CSS custom properties `@hamolus/console` already declares
+ * (`--bg`, `--surface`, `--text`, …), so a host that themes the console by overriding
+ * those variables restyles every plugin with it, and the compiled class names stay
+ * stable because exactly one build ever sees them.
  *
  * Types (`KvClient`, `ConsolePlugin`, …) live in the package root instead, so a
- * consumer that only needs the shapes never pulls StyleX into its graph.
+ * consumer that only needs the shapes never pulls StyleX into its graph — and a host
+ * that only registers plugins never pulls this file in at all.
  */
 import * as stylex from '@stylexjs/stylex'
 

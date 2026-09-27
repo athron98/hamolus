@@ -1,6 +1,10 @@
 /**
  * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
  *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
  * Licensed under the MIT License. See the LICENSE file at the repository root.
  *
  * Shared plumbing for the `hamolus add …` commands.
@@ -97,11 +101,33 @@ export interface AddOutcome {
 }
 
 /**
+ * Reject the retired source-vendoring flags for a part that is now generated from a
+ * template.
+ *
+ * `--source` / `--package` used to point a generated console or MCP server at a
+ * directory or published build whose files were copied verbatim into the project.
+ * Both parts are now template-driven and depend on their `@hamolus/*` package
+ * instead, so those flags cannot be honoured — and silently ignoring them would
+ * generate a project the caller did not ask for. `--template` (point at another
+ * template) and `hamolus link` (point at a local checkout) cover the same need.
+ */
+export function assertTemplateNotSource(args: ParsedArgs, kind: string): void {
+  const { source, package: pkg } = args.options
+  if (!source && !pkg) return
+  const used = [source ? '--source' : null, pkg ? '--package' : null].filter(Boolean).join(' / ')
+  throw new Error(
+    `${used} no longer applies to \`hamolus add ${kind}\`: it is generated from ` +
+      'templates/<kind>/basic and depends on its @hamolus package, so there is no source tree to copy.\n' +
+      'To point somewhere else, use --template <dir> for a different template, or ' +
+      '`hamolus link <path>` to develop against a local Hamolus checkout.',
+  )
+}
+
+/**
  * Guard against silently replacing an existing part.
  *
  * `--force` opts in; otherwise the command stops and explains how to redo it.
- */
-export function guardExisting(
+ */export function guardExisting(
   context: AddContext,
   kind: PartKind,
   id: string,

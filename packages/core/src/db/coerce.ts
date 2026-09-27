@@ -1,4 +1,15 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import type { FieldDefinition } from '@hamolus/types'
+import { currencyBaseOf } from '@hamolus/types'
 
 /** Convert input values (JSON) into the values stored in D1. */
 export function toDbValue(field: FieldDefinition, value: unknown): unknown {
@@ -11,12 +22,12 @@ export function toDbValue(field: FieldDefinition, value: unknown): unknown {
       const n = Number(value)
       return Number.isNaN(n) ? null : n
     }
-    case 'price': {
-      // Accept either the raw IDR base (number/string) or a serialized
-      // `{ base, display }` object — we only store the base.
-      const raw = value && typeof value === 'object' ? (value as Record<string, unknown>).base : value
-      const n = Number(raw)
-      return Number.isNaN(n) ? null : n
+    case 'currency':
+    case 'custom_currency': {
+      // Accept the raw amount (number/string) or a serialized read shape —
+      // `{ base, currency, display }` / `{ base, symbol, display }`. Only the
+      // amount is stored; the rest is derived per read.
+      return currencyBaseOf(value)
     }
     case 'richtext':
     case 'json':

@@ -1,3 +1,4 @@
+// Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>, MIT
 // Validate this configuration's wrangler.jsonc.
 //
 // `pnpm typecheck` only runs `node --check` on this file, which proves it parses but says

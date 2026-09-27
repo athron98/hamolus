@@ -1,0 +1,46 @@
+---
+import Base from '../../layouts/Base.astro'
+import { effectiveLocales } from '../../lib/company'
+
+/**
+ * The home page, built once per locale.
+ *
+ * `getStaticPaths` fetches the language list from the core and iterates it, so every
+ * language **the core** declares produces one URL. Adding a language in the core is all it
+ * takes to add pages — there is no language list to edit in this repo, and no build can
+ * fail because a list in the repo has gone stale.
+ */
+
+export async function getStaticPaths() {
+  const { defaultLocale: fallback, locales } = await effectiveLocales()
+  return locales.map((entry) => ({
+    params: { locale: entry.code },
+    props: { locale: entry.code, fallback, locales },
+  }))
+}
+
+const { locale, fallback, locales } = Astro.props
+---
+
+<Base
+  title="Hamolus Corp"
+  description="A corporate site example built with Astro and the Hamolus core."
+  lang={locale}
+  locales={locales}
+>
+  <h1>Hamolus Corp</h1>
+  <p>The language of this page: <strong>{locale}</strong>.</p>
+
+  {
+    locale !== fallback && (
+      <p>
+        <a href={`/${fallback}/`}>Open the {fallback} version</a>
+      </p>
+    )
+  }
+
+  <p>
+    The profile and team content lives in <code>[locale]/about.astro</code>. The home page is
+    deliberately short so this example stays focused on how the language list drives routing.
+  </p>
+</Base>

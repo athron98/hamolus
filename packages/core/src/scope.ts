@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import type { CoreMode } from '@hamolus/types'
 import { COLONY_DEFAULT, COLONY_SUFFIX, CORE_MODES, LAND_DEFAULT, LAND_SUFFIX, isColonyId, isLandId, scopeNameSchema } from '@hamolus/types'
 import type { ExecutionContext, MiddlewareHandler } from 'hono'

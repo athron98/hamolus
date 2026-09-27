@@ -1,0 +1,12 @@
+---
+/**
+ * The all-products catalog, page 1.
+ *
+ * This route has no `getStaticPaths` because it has no dynamic segment: one file for one
+ * URL. The category and page combinations are served by `/c/[category]/[page].astro`, which
+ * uses dynamic segments and can therefore be built statically.
+ */
+import CatalogView from '../components/CatalogView.astro'
+---
+
+<CatalogView page={1} />

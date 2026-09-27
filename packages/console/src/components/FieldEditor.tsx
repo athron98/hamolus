@@ -1,14 +1,30 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { createMemo, For, Show } from 'solid-js'
 import * as stylex from '@stylexjs/stylex'
 import {
   CONSOLE_VIEWS,
   CONTROL_TYPES,
+  CURRENCY_POSITIONS,
+  DEFAULT_CURRENCY,
   FIELD_TYPES,
   RELATION_ACTIONS,
   RELATION_KINDS,
   RICHTEXT_FORMATS,
   allowedControls,
+  formatCurrencyDisplay,
+  formatCustomCurrencyDisplay,
   type ControlType,
+  type CurrencyPosition,
+  type CustomCurrencyConfig,
   type FieldDefinition,
   type RelationAction,
   type RelationConfig,
@@ -77,6 +93,11 @@ const styles = stylex.create({
     ':hover': { color: tokens.text },
     ':focus-visible': { outline: 'none', boxShadow: `0 0 0 3px ${tokens.focusRing}` },
   },
+  help: {
+    fontSize: 11,
+    color: tokens.textDim,
+    marginTop: 2,
+  },
   toggleOn: {
     color: tokens.accent,
     backgroundColor: tokens.accentSoft,
@@ -143,6 +164,28 @@ export function FieldEditor(props: {
     }
   }
 
+  /**
+   * Patch the `customCurrency` block. An empty string clears a key rather than
+   * storing `''`, so a half-typed symbol never fails the schema's `min(1)`.
+   */
+  const setCustomCurrency = (patch: Partial<CustomCurrencyConfig>) => {
+    const next: CustomCurrencyConfig = { ...(f().customCurrency ?? {}), ...patch }
+    for (const key of Object.keys(next) as (keyof CustomCurrencyConfig)[]) {
+      const value = next[key]
+      if (value === '' || value === undefined) delete next[key]
+    }
+    set({ customCurrency: next })
+  }
+
+  const customCurrencyText = (key: keyof CustomCurrencyConfig): string => {
+    const value = f().customCurrency?.[key]
+    return value == null ? '' : String(value)
+  }
+
+  /** A live preview, so the code / affixes are visible while they are typed. */
+  const currencyPreview = (code: string) => formatCurrencyDisplay(250000, { code, locale: 'id' })
+  const customCurrencyPreview = () => formatCustomCurrencyDisplay(1234567.89, f().customCurrency ?? {})
+
   return (
     <div {...stylex.props(styles.card)}>
       <div {...stylex.props(styles.header)}>
@@ -153,7 +196,14 @@ export function FieldEditor(props: {
           title="Field type"
           onInput={(e) => {
             const t = e.currentTarget.value as FieldDefinition['type']
-            const patch: Partial<FieldDefinition> = { type: t, format: undefined }
+            const patch: Partial<FieldDefinition> = {
+              type: t,
+              format: undefined,
+              // `currency` / `customCurrency` are type-specific: leaving them on
+              // a field that is no longer monetary would fail the schema.
+              currency: t === 'currency' ? f().currency : undefined,
+              customCurrency: t === 'custom_currency' ? f().customCurrency : undefined,
+            }
             // A control valid on the previous type may be meaningless on the
             // new one (e.g. `toggle` is boolean-only) — strip it.
             if (!allowedControls({ type: t, relation: f().relation }).includes(f().control as ControlType)) {
@@ -397,6 +447,139 @@ export function FieldEditor(props: {
                 )}
               </For>
             </select>
+          </div>
+        </Show>
+        <Show when={type() === 'currency'}>
+          <div>
+            <label {...stylex.props(s.label)}>ISO 4217 code</label>
+            <input
+              {...stylex.props(s.input)}
+              value={f().currency ?? DEFAULT_CURRENCY}
+              placeholder={DEFAULT_CURRENCY}
+              maxlength={3}
+              title="ISO 4217 code — the symbol and decimal count come from it"
+              onInput={(e) => {
+                const code = e.currentTarget.value.toUpperCase()
+                set({ currency: /^[A-Z]{0,3}$/.test(code) ? code || undefined : f().currency })
+              }}
+            />
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Renders as</label>
+            <div {...stylex.props(styles.help)}>
+              {currencyPreview(f().currency ?? DEFAULT_CURRENCY)}
+            </div>
+          </div>
+        </Show>
+        <Show when={type() === 'custom_currency'}>
+          <div>
+            <label {...stylex.props(s.label)}>Symbol</label>
+            <input
+              {...stylex.props(s.input)}
+              value={customCurrencyText('symbol')}
+              placeholder="€"
+              onInput={(e) => setCustomCurrency({ symbol: e.currentTarget.value })}
+            />
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Symbol position</label>
+            <select
+              {...stylex.props(s.select)}
+              onInput={(e) => setCustomCurrency({ position: e.currentTarget.value as CurrencyPosition })}
+            >
+              <For each={CURRENCY_POSITIONS}>
+                {(pos) => (
+                  <option value={pos} selected={(f().customCurrency?.position ?? 'before') === pos}>
+                    {pos}
+                  </option>
+                )}
+              </For>
+            </select>
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Prefix</label>
+            <input
+              {...stylex.props(s.input)}
+              value={customCurrencyText('prefix')}
+              placeholder="~"
+              onInput={(e) => setCustomCurrency({ prefix: e.currentTarget.value })}
+            />
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Suffix</label>
+            <input
+              {...stylex.props(s.input)}
+              value={customCurrencyText('suffix')}
+              placeholder=" /bulan"
+              onInput={(e) => setCustomCurrency({ suffix: e.currentTarget.value })}
+            />
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Decimals</label>
+            <input
+              {...stylex.props(s.input)}
+              type="number"
+              min={0}
+              max={8}
+              value={String(f().customCurrency?.decimals ?? 2)}
+              onInput={(e) => {
+                const n = e.currentTarget.value === '' ? undefined : Number(e.currentTarget.value)
+                setCustomCurrency({ decimals: Number.isFinite(n) ? n : undefined })
+              }}
+            />
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Space after symbol</label>
+            <select
+              {...stylex.props(s.select)}
+              onInput={(e) => setCustomCurrency({ space: e.currentTarget.value === 'yes' })}
+            >
+              <option value="yes" selected={f().customCurrency?.space !== false}>yes</option>
+              <option value="no" selected={f().customCurrency?.space === false}>no</option>
+            </select>
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Decimal separator</label>
+            <input
+              {...stylex.props(s.input)}
+              value={customCurrencyText('decimalSeparator')}
+              placeholder=","
+              maxlength={3}
+              onInput={(e) => setCustomCurrency({ decimalSeparator: e.currentTarget.value })}
+            />
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Thousand separator</label>
+            <input
+              {...stylex.props(s.input)}
+              value={customCurrencyText('thousandSeparator')}
+              placeholder="."
+              maxlength={3}
+              onInput={(e) => setCustomCurrency({ thousandSeparator: e.currentTarget.value })}
+            />
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Thousands grouping</label>
+            <select
+              {...stylex.props(s.select)}
+              onInput={(e) => setCustomCurrency({ grouping: e.currentTarget.value === 'yes' })}
+            >
+              <option value="yes" selected={f().customCurrency?.grouping !== false}>yes</option>
+              <option value="no" selected={f().customCurrency?.grouping === false}>no</option>
+            </select>
+          </div>
+          <div>
+            <label {...stylex.props(s.label)}>Negative pattern</label>
+            <input
+              {...stylex.props(s.input)}
+              value={customCurrencyText('negativePattern')}
+              placeholder="-{amount}"
+              onInput={(e) => setCustomCurrency({ negativePattern: e.currentTarget.value })}
+            />
+          </div>
+          <div style={{ 'grid-column': '1 / -1' }}>
+            <label {...stylex.props(s.label)}>Preview</label>
+            <div {...stylex.props(styles.help)}>{customCurrencyPreview()}</div>
           </div>
         </Show>
         <Show when={type() === 'richtext'}>

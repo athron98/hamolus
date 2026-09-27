@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import type {
   AuthChangePasswordInput,
   AuthLoginInput,
@@ -28,8 +38,9 @@ import type {
   MediaTaxonomyDetail,
   MediaUpdate,
   MediaUploadMeta,
-  Permission,
   PanelDefinition,
+  Permission,
+  ResolvedLocalization,
   SortDir,
   SuperAdminCreateInput,
   SuperAdminUpdateInput,
@@ -220,6 +231,15 @@ export const api = {
 
   getSettings(): Promise<{ data: Record<string, unknown> }> {
     return request('/_meta/settings')
+  },
+
+  /**
+   * The project's effective localization: the core's `core.config.ts` merged with
+   * any KV override. `data` is the resolved shape (`{ defaultLocale, locales }`),
+   * or `null` when the project declares no locales at all.
+   */
+  getLocalization(): Promise<{ data: ResolvedLocalization | null }> {
+    return request('/_meta/localization')
   },
 
   putSettings(patch: Record<string, unknown>): Promise<{ data: Record<string, unknown> }> {

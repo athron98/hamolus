@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { z } from 'zod'
 
 export const PANEL_ID_PATTERN = /^[a-z][a-z0-9_]{0,63}$/
@@ -205,6 +215,13 @@ export const panelDefinitionSchema = z.object({
 })
 
 export type PanelDefinition = z.infer<typeof panelDefinitionSchema>
+
+/**
+ * Input shape for a hand-written panel definition (code-defined panels). Lets a
+ * definition literal omit schema defaults such as `menu`, `members` and
+ * `attributes`, which `PanelDefinition` requires because they are filled in.
+ */
+export type PanelDefinitionInput = z.input<typeof panelDefinitionSchema>
 
 export const panelDefinitionInputSchema = panelDefinitionSchema
 

@@ -34,11 +34,18 @@
     "clean": "turbo clean",
     "check:panel-acl": "pnpm -F @hamolus/core check:panel-acl",
     "check:scope-colony-resolution": "pnpm -F @hamolus/core check:scope-colony-resolution",
+    "check:localization": "pnpm -F @hamolus/core check:localization",
+    "check:localization-api": "pnpm -F @hamolus/core check:localization-api",
+    "check:code-definitions": "pnpm -F @hamolus/core check:code-definitions",
+    "check:code-defined-core": "pnpm -F @hamolus/cli check:code-defined-core",
     "deploy:core": "pnpm -F @hamolus/core deploy",
     "deploy:console": "pnpm -F @hamolus/console deploy",
     "deploy:mcp": "pnpm -F @hamolus/mcp deploy",
     "check:workspace-glob": "node packages/cli/scripts/check-workspace-glob.mjs",
-    "check:markers": "node packages/cli/scripts/check-markers.mjs"
+    "check:copyright": "node packages/cli/scripts/check-copyright.mjs",
+    "check:markers": "node packages/cli/scripts/check-markers.mjs",
+    "check:generated-app": "node packages/cli/scripts/check-generated-app.mjs",
+    "check:panel-runtime": "pnpm -F @hamolus/panel check:runtime"
   },
   "devDependencies": {
     "turbo": "^2.11.2",

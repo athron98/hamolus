@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import type { KVNamespace, R2Bucket } from '@cloudflare/workers-types'
 import type { CollectionDefinition } from '@hamolus/types'
 import { COLONY_DEFAULT, LAND_DEFAULT, collectionDefinitionSchema, groupDefinitionSchema } from '@hamolus/types'

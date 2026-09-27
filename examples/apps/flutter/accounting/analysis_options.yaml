@@ -1,0 +1,16 @@
+# Static analysis for this example.
+#
+# This list intentionally uses `flutter_lints` as-is, with no extra style list: an
+# integration example does not need stricter rules than the main project. What is enabled
+# under `analyzer:` is type safety (`strict-casts`, `strict-raw-types`).
+#
+# `public_member_api_docs` is deliberately **not** enabled. Every public member in `lib/`
+# is commented, but turning it on in an integration example only adds a list of style
+# warnings without teaching anything about the core integration. Enable it in your own
+# project when API documentation becomes a requirement.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true

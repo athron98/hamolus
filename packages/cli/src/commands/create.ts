@@ -1,6 +1,10 @@
 /**
  * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
  *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
  * Licensed under the MIT License. See the LICENSE file at the repository root.
  *
  * `hamolus create <name>` — scaffold a new Hamolus project.
@@ -14,19 +18,38 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import type { ParsedArgs } from '../args.js'
-import { CORE_MODES, type CoreMode } from '../help.js'
+import type { CoreMode } from '../help.js'
 import { linkManifestFile, resolveLinkRoot } from '../link.js'
 import { PROJECT_FILE, PROJECT_FILE_VERSION, now, writeProject, type Project } from '../project.js'
-import { copyTemplate, formatLabel, resolveTemplateDirectory } from '../templates.js'
+import { copyTemplate, formatLabel, resolveTemplateDirectory, type ResolvedTemplate } from '../templates.js'
 import { BASE_COMPILER_OPTIONS } from '../tsconfig.js'
 import { dim, info, next, step, success, warn } from '../util/log.js'
 
 const NAME_PATTERN = /^[a-z][a-z0-9_-]{0,62}$/
 
+/**
+ * Template name used when a kind (or a core mode) has no template of its own.
+ * Every template kind is a directory of named templates — `cores/basic`,
+ * `consoles/basic`, `panels/basic`, … — so a kind that ships exactly one template
+ * still resolves by name instead of by falling back to its own parent directory.
+ */
+export const BASIC_TEMPLATE = 'basic'
+
+/**
+ * Core templates ship as named directories under `templates/cores/`, and `--core`
+ * picks one by name. The set is open — a repository may add `cores/minimal` of its
+ * own — so the value is checked for *shape* rather than membership, and the shape is
+ * a single path segment: the name is joined onto `cores/`, and anything carrying a
+ * separator or `..` would resolve outside the template directory.
+ */
+const CORE_TEMPLATE_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
+
 export interface CreateOptions {
   name: string
   mode: CoreMode
   output: string
+  /** Named core template, from `--core`. Defaults to the mode's template, then `basic`. */
+  core?: string
   template?: string
   /** Hamolus checkout to `@hamolus/*` link into, from `--link`. */
   link?: string
@@ -43,6 +66,20 @@ export function parseCreateOptions(args: ParsedArgs): CreateOptions {
         'starting with a letter.',
     )
   }
+  if (args.options.core && args.options.template) {
+    throw new Error(
+      'Pass either --core <name> (a template under templates/cores) or --template <path> ' +
+        '(a template directory of your own) — not both, since the second already says which ' +
+        'files to copy.',
+    )
+  }
+  if (args.options.core && !CORE_TEMPLATE_NAME_PATTERN.test(args.options.core)) {
+    throw new Error(
+      `Invalid core template name "${args.options.core}". Use a plain name such as ` +
+        `"${BASIC_TEMPLATE}" or "predefined" (lowercase letters, digits, dashes or underscores, ` +
+        'starting with a letter). For a template outside templates/cores, pass --template <path>.',
+    )
+  }
   const output = args.options.output
     ? resolve(process.cwd(), args.options.output)
     : resolve(process.cwd(), name)
@@ -50,6 +87,7 @@ export function parseCreateOptions(args: ParsedArgs): CreateOptions {
     name,
     mode: args.options.mode ?? 'independent',
     output,
+    core: args.options.core,
     template: args.options.template,
     link: args.options.link,
     force: args.flags.force,
@@ -199,12 +237,27 @@ function envExample(options: CreateOptions): string {
   ].join('\n')
 }
 
-const PROJECT_README = (options: CreateOptions): string => `# ${formatLabel(options.name)}
+/**
+ * The generated project's own README.
+ *
+ * `core` is reported from what was actually copied rather than from the template's
+ * name, so a repository's own template that ships a `src/collections` barrel is
+ * described the same way the shipped ones are.
+ */
+const PROJECT_README = (
+  options: CreateOptions,
+  core: { template: string; codeDefinitions: boolean },
+): string => `# ${formatLabel(options.name)}
 
 A [Hamolus](https://github.com/hamolus-labs/hamolus) project created with
 \`hamolus create ${options.name}\`.
 
 - **Core mode**: \`${options.mode}\` (see \`core/README.md\`)
+- **Core template**: \`${core.template}\` — ${
+    core.codeDefinitions
+      ? 'ships a collection and a panel defined in `core/src/` (edit those files, not the API)'
+      : 'no collections or panels yet — create them in the console or the API'
+  }
 
 ## Layout
 
@@ -276,7 +329,10 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
         id: options.name,
         label: `${formatLabel(options.name)} core`,
         path: relativeCore,
-        source: 'templates/cores',
+        // The template that was actually copied, so `hamolus list` can say where the
+        // core came from — `--core predefined` and a mode override are both different
+        // directories, and reporting `basic` for either would be a lie.
+        source: template.source,
         generatedAt: now(),
       },
     ],
@@ -287,7 +343,18 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
   await writeProject(options.output, project)
   await writeFile(join(options.output, '.gitignore'), GITIGNORE, 'utf8')
   await writeFile(join(options.output, '.env.example'), envExample(options), 'utf8')
-  await writeFile(join(options.output, 'README.md'), PROJECT_README(options), 'utf8')
+  await writeFile(
+    join(options.output, 'README.md'),
+    PROJECT_README(options, {
+      template: template.source,
+      // A `src/collections` barrel is what a code-defined schema looks like on disk,
+      // and it is the one file whose presence decides the wording above.
+      codeDefinitions: copied.written.some((path) =>
+        path.endsWith(join('src', 'collections', 'index.ts')),
+      ),
+    }),
+    'utf8',
+  )
   // Packages generated by the CLI ship self-contained tsconfigs, but your own code
   // needs a base to extend, exactly like the Hamolus monorepo has.
   await writeFile(join(options.output, 'tsconfig.base.json'), tsconfigBase(), 'utf8')
@@ -316,14 +383,52 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
   ])
 }
 
-async function resolveCoreTemplate(options: CreateOptions) {
-  const relative = join('cores', options.mode)
-  const resolved = await resolveTemplateDirectory(options.template, process.cwd(), relative)
-  if (resolved) return resolved
-  const fallback = await resolveTemplateDirectory(options.template, process.cwd(), 'cores')
-  if (fallback) return fallback
+/** A core template that has been located, plus the label recorded for it. */
+export interface ResolvedCoreTemplate extends ResolvedTemplate {
+  /**
+   * Where the files came from, as `hamolus list` should show it: a shipped template
+   * (`templates/cores/predefined`) or the directory an explicit `--template` named.
+   */
+  source: string
+}
+
+/**
+ * Resolve the core template, and the label `hamolus list` reports for it.
+ *
+ * With `--core <name>` the name *is* the request: only `cores/<name>` is looked for, so
+ * a typo fails loudly instead of quietly producing the default template — silently
+ * answering a `--core predefined` with a schema-less core is the one outcome worse than
+ * an error, because the project looks fine until something is missing from it.
+ *
+ * Without it, the candidates are tried in order:
+ *
+ *   1. `cores/<mode>` — a repository may ship a mode-specific override
+ *      (`cores/centralized`, …),
+ *   2. `cores/basic`.
+ *
+ * The mode is a tenancy switch (a `CORE_MODE` var in `wrangler.jsonc`, not a different
+ * file tree), so a mode with no template of its own falls back to `basic`.
+ *
+ * Falling back to `templates/cores` is deliberately *not* done: that directory now
+ * holds the named templates, so copying it would emit a core containing a stray
+ * `basic/` folder.
+ */
+async function resolveCoreTemplate(options: CreateOptions): Promise<ResolvedCoreTemplate> {
+  if (options.template) {
+    const explicit = await resolveTemplateDirectory(options.template, process.cwd(), '')
+    if (!explicit) throw new Error(`Template directory not found: ${options.template}`)
+    return { ...explicit, source: explicit.directory }
+  }
+
+  const candidates = options.core ? [options.core] : [options.mode, BASIC_TEMPLATE]
+
+  for (const name of candidates) {
+    const resolved = await resolveTemplateDirectory(undefined, process.cwd(), join('cores', name))
+    if (resolved) return { ...resolved, source: `templates/cores/${name}` }
+  }
+
   throw new Error(
-    `No core template found for mode "${options.mode}" (looked for templates/${relative}).\n` +
-      `Available modes: ${CORE_MODES.join(', ')}. Pass --template <dir> to point elsewhere.`,
+    `No core template found (looked for ${candidates.map((name) => `templates/cores/${name}`).join(', ')}).\n` +
+      'Pass --core <name> for another template shipped with the CLI, or --template <dir> to point elsewhere.',
   )
 }

@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/solid-query'
 import type { CollectionDefinition } from '@hamolus/types'
 import { api } from '../lib/api'

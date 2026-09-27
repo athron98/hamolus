@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 /**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ *
  * Template-token regression check.
  *
  * Why this exists: a template is an ordinary directory of files containing
@@ -81,6 +89,29 @@ const SUPPLIED_BY = {
   'add configuration': ['CONFIG_ID', 'CONFIG_NAME', 'CONFIG_SLUG', 'PACKAGE_NAME'],
   'add seed': ['SEED_ID', 'SEED_NAME', 'SEED_SLUG', 'PACKAGE_NAME'],
   'add panel': ['PANEL_ID', 'PANEL_NAME', 'PANEL_SLUG'],
+  'add console': ['PROJECT_NAME', 'PROJECT_LABEL', 'PROJECT_SCOPE', 'PROJECT_SLUG', 'PACKAGE_NAME'],
+  'add mcp': ['PROJECT_NAME', 'PROJECT_LABEL', 'PROJECT_SCOPE', 'PROJECT_SLUG', 'PACKAGE_NAME'],
+}
+
+/**
+ * The generated console's pre-paint theme script.
+ *
+ * `packages/console/index.html` inlines a small JS snippet that reads the stored
+ * mode/palette/font and sets `data-mode` / `data-theme` / `data-font` on <html>
+ * before the bundle runs — without it, every reload flashes the default palette
+ * until hydration. The console template carries a copy so a generated app gets the
+ * same behaviour with no extra file to fetch, which means the two snippets are a
+ * silent-drift hazard: editing one and not the other is invisible until someone
+ * reloads a generated app and gets the wrong palette. The checker extracts both and
+ * compares them, so the copy cannot rot.
+ */
+const THEME_SCRIPT = /<script>\n([\s\S]*?)<\/script>/g
+const CANONICAL_INDEX_HTML = join(REPO, 'packages', 'console', 'index.html')
+const CONSOLE_INDEX_HTML = join(TEMPLATES, 'consoles', 'basic', 'index.html')
+
+function themeScriptOf(file) {
+  const match = [...readFileSync(file, 'utf8').matchAll(THEME_SCRIPT)][0]
+  return match ? match[1].trim() : null
 }
 
 const MODES = ['independent', 'centralized', 'proxy', 'bridge']
@@ -143,6 +174,8 @@ try {
     ['configurations/basic', 'add configuration'],
     ['seeds/basic', 'add seed'],
     ['panels/basic', 'add panel'],
+    ['consoles/basic', 'add console'],
+    ['mcps/basic', 'add mcp'],
   ]
 
   for (const [dir, command] of parts) {
@@ -186,6 +219,8 @@ try {
       ['add', 'configuration', 'basic'],
       ['add', 'seed', 'demo'],
       ['add', 'panel', 'orders'],
+      ['add', 'console'],
+      ['add', 'mcp'],
     ]) {
       const out = run(app, part)
       ok(`${mode}: \`hamolus ${part.join(' ')}\` succeeds`, out.status === 0, `${out.stdout}\n${out.stderr}`)
@@ -223,6 +258,17 @@ try {
       wrangler,
     )
   }
+
+  // 2b. The console template's theme script is the console's own, byte for byte.
+  const canonical = themeScriptOf(CANONICAL_INDEX_HTML)
+  const copy = themeScriptOf(CONSOLE_INDEX_HTML)
+  ok(
+    'the generated console carries the canonical pre-paint theme script',
+    canonical !== null && canonical === copy,
+    canonical === null
+      ? `no inline <script> block found in ${relative(REPO, CANONICAL_INDEX_HTML)}`
+      : 'the two snippets differ — copy the script from packages/console/index.html into templates/consoles/basic/index.html',
+  )
 
   // 3. A token the command does not supply fails at the copy site, loudly.
   //

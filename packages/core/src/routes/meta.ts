@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { Hono } from 'hono'
 import type { AuthTokenPayload } from '@hamolus/types'
 import type { Env } from '../env'
@@ -11,8 +21,10 @@ import {
 } from '../meta/store'
 import { deleteGroup, getGroup, listGroups, putGroup } from '../meta/groups'
 import { getSettings, putSettings } from '../meta/settings'
+import { effectiveLocalization } from '../config'
 import { getDashboardStats } from '../meta/stats'
 import { PROTECTED_COLLECTION } from '../auth/privileges'
+import { isCodeCollection } from '../definitions'
 import { requireRead, requireSession, requireWrite } from '../auth/session'
 import { resolveRequestScope } from '../scope'
 
@@ -36,6 +48,22 @@ metaRoutes.get('/settings', async (c) => {
   const scope = await resolveRequestScope(c)
   const data = await getSettings(c.env.SETTINGS, scope.land, scope.colony)
   return c.json({ data })
+})
+
+/**
+ * The project's effective localization: `core.config.ts` with any KV override.
+ *
+ * The console needs this to render a language switcher, but it must not have to
+ * mirror the core's list in its own config — so the core answers for itself.
+ * `data` is `null` when the project declares no locales, which is what a
+ * single-locale (or not-yet-configured) project looks like.
+ */
+metaRoutes.get('/localization', async (c) => {
+  const payload = c.get('jwtPayload') as AuthTokenPayload | undefined
+  requireRead(payload, 'settings.read')
+  const scope = await resolveRequestScope(c)
+  const settings = await getSettings(c.env.SETTINGS, scope.land, scope.colony)
+  return c.json({ data: effectiveLocalization(settings) ?? null })
 })
 
 /** Merge `patch` into the current settings and persist to KV. */
@@ -81,6 +109,12 @@ metaRoutes.put('/collections/:name', async (c) => {
   if (name === PROTECTED_COLLECTION) {
     throw forbidden(`The '${PROTECTED_COLLECTION}' definition is managed by the platform`)
   }
+  if (isCodeCollection(name)) {
+    throw forbidden(
+      `The '${name}' definition is declared in code (src/collections) and is read-only. Edit the file and redeploy to change it.`,
+      'CODE_DEFINED_COLLECTION',
+    )
+  }
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null
   if (!body || typeof body !== 'object') throw badRequest('Body must be a JSON object')
   if (body.name !== undefined && body.name !== name) {
@@ -96,6 +130,12 @@ metaRoutes.delete('/collections/:name', async (c) => {
   requireWrite(payload, 'collections.write')
   const scope = await resolveRequestScope(c)
   const name = c.req.param('name')
+  if (isCodeCollection(name)) {
+    throw forbidden(
+      `The '${name}' definition is declared in code (src/collections) and is read-only. Edit the file and redeploy to change it.`,
+      'CODE_DEFINED_COLLECTION',
+    )
+  }
   // Deleting `privileges` is allowed (ensurePrivileges re-bootstraps the
   // definition + seeds with stable ids on the next request), so seeds keep working.
   await deleteCollection(db, name, scope.land, scope.colony)

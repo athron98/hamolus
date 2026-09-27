@@ -25,8 +25,19 @@ hamolus list                             What this project contains
 ```
 
 Common options: `-o, --output <path>`, `--mode <independent|centralized|proxy|bridge>`,
-`--template <path>`, `--source <path>`, `--package <name>`, `--link <path>`,
-`--force`, `--dry-run`, `-y, --yes`.
+`--core <basic|predefined>`, `--template <path>`, `--link <path>`, `--force`,
+`--dry-run`, `-y, --yes`.
+
+`--source <path>` and `--package <name>` are no longer accepted by `hamolus add console`
+or `hamolus add plugin`. Both depend on their `@hamolus/*` package instead of copying a
+source tree, and for a plugin that is the point: vendored plugin source would only build if
+the host console added `vite-plugin-solid` and a StyleX compiler. Use `--template <dir>` to
+point at a different template, or `hamolus link <path>` to develop against a local
+checkout.
+
+`--core` picks the named core template: `basic` ships no schema, `predefined` ships a
+collection and a panel under `core/src/`. It cannot be combined with `--template`, which
+already names a directory of its own.
 
 ## Source resolution
 
@@ -38,6 +49,11 @@ order is what lets a published CLI generate the same output as a local checkout.
 
 The canonical templates ship in `templates/`. `packages/cli/templates` is a copy
 refreshed on `prepack` — edit `templates/`, never the copy.
+
+A core is generated from a named directory: `templates/cores/<name>`, resolved in the
+order `templates/cores/<--core>`, then `templates/cores/<--mode>`, then
+`templates/cores/basic`. The resolved name is recorded as the core's `source` in
+`hamolus.json`, so `hamolus list` can say where a core came from.
 
 ## License
 

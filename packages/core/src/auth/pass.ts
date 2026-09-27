@@ -1,4 +1,12 @@
 /**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ *
  * Password hashing with WebCrypto PBKDF2 (available in Workers / D1).
  * Stored format: `pbkdf2$v=1$iter=100000$<salt_b64>$<hash_b64>`.
  */

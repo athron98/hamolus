@@ -1,0 +1,63 @@
+---
+import Base from '../layouts/Base.astro'
+import { listPublishedArticles } from '../lib/articles'
+import { HamolusApiError } from '../lib/hamolus'
+
+/**
+ * The article list.
+ *
+ * This page is static: `astro build` runs it once and stores the result as HTML. The
+ * consequence is that a new article does **not** appear until the next build runs — that
+ * comes from how a build works, not from a bug; the README covers what to do about it
+ * (periodic builds, or `output: 'server'`).
+ *
+ * `PUBLIC_HAMOLUS_ORIGIN` therefore has to point at a core the build machine can reach,
+ * not at the `localhost` of whoever is doing the building.
+ */
+
+let articles: Awaited<ReturnType<typeof listPublishedArticles>>['data'] = []
+let failure: string | undefined
+
+try {
+  articles = (await listPublishedArticles()).data
+} catch (cause) {
+  // A build must not stop silently because the core is down. HTML still gets emitted, but
+  // the page carries an explanation instead of a misleading empty list.
+  failure =
+    cause instanceof HamolusApiError
+      ? `${cause.code} — ${cause.message}`
+      : 'Could not reach the core.'
+}
+---
+
+<Base title="Hamolus Blog" description="An Astro blog example that reads its content from the Hamolus core.">
+  <h1>Articles</h1>
+
+  {
+    failure && (
+      <p role="alert">
+        Could not load articles: {failure}. This page was built without data.
+      </p>
+    )
+  }
+
+  {!failure && articles.length === 0 && <p>No articles have been published yet.</p>}
+
+  {
+    !failure &&
+    articles.map((article) => (
+      <article>
+        <h2>
+          <a href={`/blog/${article.slug}/`}>{article.title}</a>
+        </h2>
+        <p class="meta">
+          {article.author_name} · <time datetime={article.published_at}>{article.published_at}</time>
+        </p>
+        <p class="excerpt">{article.excerpt}</p>
+        {article.tags.map((tag) => (
+          <span class="tag">{tag}</span>
+        ))}
+      </article>
+    ))
+  }
+</Base>

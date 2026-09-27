@@ -96,7 +96,7 @@ render a folder glyph. Stored as metadata — no DDL/route change beyond the
 {
   "name": "title",          // snack_case
   "label": "Title",         // optional; human label for forms/tables (falls back to title-cased name)
-  "type": "string",         // id|string|text|number|boolean|date|datetime|slug|enum|json|richtext|email|url|relation|media|price|document|attachment
+  "type": "string",         // id|string|slug|text|richtext|number|currency|custom_currency|boolean|date|datetime|enum|json|email|url|relation|media|document|attachment
   "required": true,         // optional
   "unique": true,           // optional → UNIQUE column
   "indexed": true,          // optional
@@ -145,14 +145,23 @@ Notes:
   chips). A `multichecklist` **enum** stores a JSON array (`z.array(z.enum(...))`)
   in the TEXT column and is parsed back on read, mirroring `relation` hasMany;
   a `multichecklist` `relation` stores an array of target PKs.
-- `type: "price"` — numeric IDR amount stored as a REAL column (direct number, not
-  text). Read responses always shape it as a `PriceDisplay` object
-  `{ "base": 250000, "display": "mulai dari IDR 250K" }` — `base` is the raw IDR amount,
-  `display` is the locale-aware phrase the core renders for the active `?locale=`
-  (compact IDR like `mulai dari IDR 250K`/`mulai dari IDR 1.5M` for `id`; `Start from $19`
-  USD at the default rate with a 20% markup for `en`). The site keeps the numeric
-  `base` for its live exchange-rate patching (`[data-idr]`). Writes accept a number
-  (normalized to IDR) or the object.
+- `type: "currency"` — a monetary amount stored as a REAL column (direct number,
+  not text). `currency` is the ISO 4217 code (`"IDR"`, `"USD"`, `"EUR"`; defaults
+  to `IDR`) and must be three uppercase letters. The symbol and the conventional
+  decimal count come from the code, the separators from the requested `?locale=`.
+  Read responses always shape it as a `MoneyValue`
+  `{ "base": 250000, "currency": "IDR", "display": "Rp 250.000" }` (`Rp 250,000` for
+  `locale=en`) — `base` is the raw amount in `currency`, so a site can patch
+  `display` with a live exchange rate without re-reading the record. Writes accept
+  a number (normalized to the amount) or the object, so a read value round-trips.
+- `type: "custom_currency"` — the same REAL column for a unit that has no ISO
+  code: loyalty points, credits, billable hours, `Rp /bulan`. The field carries its
+  own `customCurrency` block — `symbol`, `prefix`, `suffix`, `position`,
+  `space`, `decimals`, `grouping`, `decimalSeparator`, `thousandSeparator` and a
+  `negativePattern` with `{amount}` / `{symbol}` placeholders. Reads return
+  `{ "base": 1500000, "symbol": "€", "display": "€1.500.000,00" }` with the
+  `null` symbol when the field declares none. `customCurrency` is only valid on a
+  `custom_currency` field, exactly as `format` is richtext-only.
 
 Endpoints:
 
@@ -210,6 +219,22 @@ KV-backed, free-form JSON (see [the settings reference](../../core/docs/settings
 curl -X PUT http://localhost:8787/api/_meta/settings \
   -H 'authorization: Bearer <jwt>' -H 'content-type: application/json' \
   -d '{"site":{"name":"Acme","navigation":[{"label":"Home","href":"/"}]}}'
+```
+
+### Effective localization (`/_meta/localization`)
+
+| Method | Endpoint              | Behavior                                        |
+| ------ | --------------------- | ----------------------------------------------- |
+| GET    | `/_meta/localization` | The project's effective locales, or `data: null` |
+
+Resolves `core.config.ts` against the KV override (a valid KV `localization` wins) so
+clients can render a language switcher without duplicating the list. Requires
+`settings.read`; public under `PUBLIC_GETS=true`.
+
+```jsonc
+// GET /api/_meta/localization
+{ "data": { "defaultLocale": "en", "multilingual": true,
+            "locales": [{ "code": "en", "label": "English" }] } }
 ```
 
 ## Seed export/restore (`/_meta/seed`)

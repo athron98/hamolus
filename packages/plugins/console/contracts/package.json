@@ -2,6 +2,11 @@
   "name": "@hamolus/plugin-console-contracts",
   "version": "0.1.0",
   "license": "MIT",
+  "author": "Gilang Albathin Nurhabibi <https://github.com/athron98>",
+  "homepage": "https://github.com/hamolus-labs/hamolus/tree/main/packages/plugins/console/contracts#readme",
+  "bugs": {
+    "url": "https://github.com/hamolus-labs/hamolus/issues"
+  },
   "description": "Types and shared StyleX design tokens for Hamolus console plugins.",
   "type": "module",
   "sideEffects": false,
@@ -25,11 +30,8 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
-    "typecheck": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "@stylexjs/stylex": "^0.19.1",
-    "solid-js": "^1.9.15"
+    "typecheck": "tsc --noEmit",
+    "prepack": "node ../../../cli/scripts/copy-license.mjs"
   },
   "devDependencies": {
     "@stylexjs/stylex": "^0.19.1",

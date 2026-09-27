@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { createEffect, createSignal, For, Index, Show } from 'solid-js'
 import type { CollectionDefinition, PanelDefinition, PanelMetricDefinition, PanelViewDefinition } from '@hamolus/types'
 import { PANEL_OPERATIONS, PANEL_VIEW_KINDS, panelDefinitionSchema } from '@hamolus/types'

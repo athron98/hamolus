@@ -1,4 +1,12 @@
 /**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ *
  * Client-side image processing helpers used by the upload + media flows.
  * Both return WebP files (requirement: images are stored as WebP) — the
  * thumbnail is a small downscaled WebP used for lazy loading.

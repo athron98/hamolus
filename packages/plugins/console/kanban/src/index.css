@@ -1,0 +1,27 @@
+/*
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ *
+ * Build anchor for this package's stylesheet.
+ *
+ * A host registers a plugin by listing it in `console.config.ts` and nothing else — it
+ * never writes `import '.../style.css'` — so this package has to be able to hand its
+ * compiled styles to the host's build on its own. Two things make that work:
+ *
+ * 1. This file gives Vite a real CSS entry to extract. StyleX alone emits its rules as
+ *    a hashed asset under `assets/`, which no one can name or rely on; a named import
+ *    produces the predictable `dist/index.css` that the entry chunk points at.
+ * 2. `vite.lib.config.ts` rewrites the entry chunk to `import './index.css'`, so the
+ *    host's bundler follows that import and folds the plugin's styles into its own
+ *    output the same way it would for any other dependency.
+ *
+ * Plugin styles are written with StyleX, so this file is intentionally empty of rules.
+ * Anything added here ships as plain CSS and will not be themed by the console's
+ * variables — prefer `stylex.create` with the shared tokens in
+ * `@hamolus/plugin-console-contracts/styles.stylex.ts`.
+ */

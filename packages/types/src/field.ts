@@ -1,4 +1,15 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { z } from 'zod'
+import { currencyCodeSchema, customCurrencyConfigSchema, type CustomCurrencyConfig } from './currency'
 
 export const FIELD_TYPES = [
   'id',
@@ -7,7 +18,8 @@ export const FIELD_TYPES = [
   'text',
   'richtext',
   'number',
-  'price',
+  'currency',
+  'custom_currency',
   'boolean',
   'date',
   'datetime',
@@ -101,6 +113,18 @@ export interface FieldDefinition {
   enumValues?: string[]
   relation?: RelationConfig
   /**
+   * ISO 4217 code for `type === 'currency'` fields (e.g. `IDR`, `USD`, `EUR`).
+   * The symbol and the conventional decimal count come from the code; the
+   * separators come from the requested locale. Defaults to `IDR`.
+   */
+  currency?: string
+  /**
+   * Formatting for `type === 'custom_currency'` fields — a unit that has no ISO
+   * code and needs its own symbol, affixes and separators. See
+   * {@link CustomCurrencyConfig}.
+   */
+  customCurrency?: CustomCurrencyConfig
+  /**
    * Console record-form widget. Only valid on `enum`, `relation` and `boolean`
    * fields — use `allowedControls()` to see the options for a given field.
    * Absent = the current default widget (select for enum / belongsTo, the
@@ -156,6 +180,8 @@ export const fieldDefinitionSchema = z
     max: z.number().optional(),
     enumValues: z.array(z.string()).min(1).optional(),
     relation: relationConfigSchema.optional(),
+    currency: currencyCodeSchema.optional(),
+    customCurrency: customCurrencyConfigSchema.optional(),
     control: z.enum(CONTROL_TYPES).optional(),
     format: z.enum(RICHTEXT_FORMATS).optional(),
     hidden: z.boolean().optional(),
@@ -172,6 +198,14 @@ export const fieldDefinitionSchema = z
   .refine((f) => (f.type === 'richtext' ? true : f.format === undefined), {
     message: 'format is only valid on richtext fields',
     path: ['format'],
+  })
+  .refine((f) => (f.type === 'currency' ? true : f.currency === undefined), {
+    message: 'currency is only valid on currency fields',
+    path: ['currency'],
+  })
+  .refine((f) => (f.type === 'custom_currency' ? true : f.customCurrency === undefined), {
+    message: 'customCurrency is only valid on custom_currency fields',
+    path: ['customCurrency'],
   })
   .refine((f) => {
     if (f.control === undefined) return true

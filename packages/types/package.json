@@ -46,7 +46,8 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "node ../cli/scripts/copy-license.mjs"
   },
   "dependencies": {
     "zod": "^4.6.5"

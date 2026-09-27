@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { createEffect, createMemo, createSignal, Match, on, onMount, Show, Switch } from 'solid-js'
 import { useBeforeLeave, useParams } from '@solidjs/router'
 import type { BeforeLeaveEventArgs } from '@solidjs/router'
@@ -17,6 +27,7 @@ import { useDeleteRecord, useBulkDelete, useRecords, useSaveRecord, type RecordR
 import { api } from '../lib/api'
 import { locale } from '../lib/locale'
 import { pinned, togglePin } from '../lib/prefs'
+import { useLocalization } from '../hooks/localization'
 
 const DEFAULT_PAGE_SIZE = 20
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100] as const
@@ -161,7 +172,7 @@ export function CollectionPage() {
   const [selected, setSelected] = createSignal<RecordRow | null>(null)
   const [creating, setCreating] = createSignal(false)
   const [formError, setFormError] = createSignal<string | null>(null)
-  const [languages, setLanguages] = createSignal<string[]>([])
+  const localization = useLocalization()
   const [dirty, setDirty] = createSignal(false)
   let sheet: SheetApi | undefined
   const [confirmState, setConfirmState] = createSignal<
@@ -188,21 +199,6 @@ export function CollectionPage() {
       setSortDir(s.dir)
     }),
   )
-
-  onMount(async () => {
-    try {
-      const { data } = await api.getSettings()
-      const loc = data.localization
-      if (loc && typeof loc === 'object' && 'languages' in loc) {
-        const langs = (loc as Record<string, unknown>).languages
-        if (Array.isArray(langs) && langs.every((l) => typeof l === 'string')) {
-          setLanguages(langs as string[])
-        }
-      }
-    } catch {
-      // settings not available, continue without languages
-    }
-  })
 
   const save = useSaveRecord(name)
   const remove = useDeleteRecord(name)
@@ -466,7 +462,7 @@ export function CollectionPage() {
                 onSubmit={submit}
                 onCancel={() => sheet?.requestClose()}
                 onDirtyChange={setDirty}
-                languages={languages()}
+                languages={localization.languages()}
                 locale={locale()}
               />
             </Match>
@@ -479,7 +475,7 @@ export function CollectionPage() {
                 onCancel={() => sheet?.requestClose()}
                 onDelete={deleteRow}
                 onDirtyChange={setDirty}
-                languages={languages()}
+                languages={localization.languages()}
                 locale={locale()}
               />
             </Match>

@@ -1,3 +1,13 @@
+/**
+ * Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * Author: Gilang Albathin Nurhabibi <https://github.com/athron98>
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Licensed under the MIT License. See the LICENSE file at the repository root.
+ */
+
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { cors } from 'hono/cors'
@@ -10,6 +20,7 @@ import { publicGetsEnabled } from './env'
 import { createDb } from './db/client'
 import { HttpError } from './errors'
 import { ensurePrivileges } from './auth/privileges'
+import { ensureCodeDefinitions, type CodeDefinitions } from './definitions'
 import { createScopeRewrite, resolveRequestScope } from './scope'
 import type { ScopeContext } from './scope'
 import { authRoutes } from './routes/auth'
@@ -26,11 +37,19 @@ import { getMediaRowByKey } from './media/store'
 import { rowToMedia } from './media/store'
 import type { MediaObject } from '@hamolus/types'
 import type { FileObject } from '@hamolus/types'
+import type { CoreConfig } from '@hamolus/types'
 import { getFileRowByBasename } from './files/store'
 import { rowToFile } from './files/store'
 import { getPanelAssetById, verifyPanelAssetSignature } from './media/panel-assets'
 import { ensureLandsRegistry } from './meta/lands'
 
+// Re-exported so a project's own Worker entry can declare its build-time config
+// (`import app, { setCoreConfig } from '@hamolus/core'`) without reaching into the
+// package's internals. The default export below stays the Worker entry.
+export { setCoreConfig, getCoreConfig } from './config'
+export type { CoreConfig }
+export { getCodeDefinitions, setCodeDefinitions } from './definitions'
+export type { CodeDefinitions }
 const AUTH_SKIP = new Set(['/api/_auth/token', '/api/_auth/login', '/api/_auth/setup', '/api/_auth/super', '/api/health'])
 
 type AppEnv = {
@@ -79,7 +98,7 @@ async function applyScope(c: Context<AppEnv>, db: ReturnType<typeof createDb>): 
   c.set('scope', scope)
   c.set('land', scope.land)
   c.set('colony', scope.colony)
-  await bootstrapScopePrivileges(db, scope.land, scope.colony, c.env.SETTINGS)
+  await bootstrapScope(db, scope.land, scope.colony, c.env.SETTINGS)
 }
 
 /**
@@ -88,8 +107,12 @@ async function applyScope(c: Context<AppEnv>, db: ReturnType<typeof createDb>): 
  * user or role can be created in it. Gated on a registered scope so a request
  * carrying an unknown `x-land`/`x-colony` header cannot mint privileges for a
  * scope that does not exist.
+ *
+ * Code-defined collections and panels are applied in the same pass, so every
+ * registered scope starts from the baseline checked into the repository rather
+ * than only the default one.
  */
-async function bootstrapScopePrivileges(
+async function bootstrapScope(
   db: ReturnType<typeof createDb>,
   land: string,
   colony: string,
@@ -100,6 +123,7 @@ async function bootstrapScopePrivileges(
   if (!registry.colonies.get(land)?.has(colony)) return
   if (registry.ownerOf.get(colony) !== land) return
   await ensurePrivileges(db, land, colony)
+  await ensureCodeDefinitions(db, land, colony)
 }
 
 app.get('/', (c) => c.json({ ok: true, service: 'core' }))

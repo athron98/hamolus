@@ -73,6 +73,50 @@ The console automatically renders language tabs for localized fields, allowing e
 to input values for each configured language. The core API validates that localized
 values match the configured language structure.
 
+## `core.config.ts` — the build-time floor
+
+A project declares a *floor* for its settings in a checked-in `core.config.ts` at the
+project root. The generated Worker hands it to the core at start-up:
+
+```ts
+// src/index.ts
+import app, { setCoreConfig } from '@hamolus/core'
+import { config } from '../core.config'
+
+setCoreConfig(config)
+export default app
+```
+
+```ts
+// core.config.ts
+import { defineCoreConfig } from '@hamolus/types'
+
+export const config = defineCoreConfig({
+  localization: {
+    defaultLocale: 'en',
+    locales: [
+      { code: 'en', label: 'English' },
+      { code: 'id', label: 'Bahasa Indonesia' },
+    ],
+  },
+})
+```
+
+**Precedence**: `core.config.ts` supplies defaults; a **valid** `localization` object in
+KV replaces the configured value entirely (it is not merged per-locale), so a
+non-empty KV `localization` makes the file's locales irrelevant at runtime. With no
+valid KV override, the file's value is what the core uses.
+
+Two consequences worth knowing:
+
+- A project with **no** locales (`locales: []`, or no `localization` block) stays
+  monolingual, and a `localized: true` field then accepts a plain string — declaring
+  zero languages must not make localized fields stricter.
+- `GET /api/_meta/localization` returns the effective value (`data: null` when the
+  project declares none) so clients never have to mirror the list. It needs
+  `settings.read`, and under `PUBLIC_GETS=true` it is public like the rest of the
+  `_meta` read surface.
+
 ## Consumption in the site
 
 - `src/lib/api.ts` → `getSettings()` returns the blob (or `{}` on failure).

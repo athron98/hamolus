@@ -1,0 +1,6 @@
+# Dart and Flutter artifacts.
+# pubspec.lock is committed: this is an application, not a package.
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies

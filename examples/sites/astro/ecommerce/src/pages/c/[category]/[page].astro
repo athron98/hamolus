@@ -1,0 +1,84 @@
+---
+/**
+ * The catalog page per category and per page.
+ *
+ * The route has two dynamic segments (`[category]`, `[page]`), so `getStaticPaths` really
+ * can attach more than one combination. Two things are held in check so the build does not
+ * explode:
+ *
+ * 1. **The page count is capped.** `MAX_PAGES` stops it firmly; even so, a core holding
+ *    thousands of products still produces thousands of HTML files once the cap is reached.
+ *    Raise it only if you are ready to store the result.
+ * 2. **The page count per category is read from `meta.totalPages`, with the same `pageSize`
+ *    used when the page is rendered.** Counting with a different `pageSize` — even one that
+ *    makes the response smaller — produces empty pages, because `totalPages` then comes from
+ *    a division that does not match the one the rendered page used.
+ *
+ * `MAX_PAGES` is deliberately *imported* from `lib/catalog` rather than written as a `const`
+ * in the page frontmatter. Astro runs `getStaticPaths` in its own module that carries only
+ * the *imports* and the function body; a `const` in the page frontmatter is not carried
+ * over, so the build dies with "MAX_PAGES is not defined" while `astro check` stays green.
+ */
+
+import CatalogView from '../../../components/CatalogView.astro'
+import {
+  categorySlug,
+  listCategories,
+  listProducts,
+  MAX_PAGES,
+  PAGE_SIZE,
+} from '../../../lib/catalog'
+import { defaultLocale } from '../../../lib/hamolus'
+import type { Category } from '../../../lib/catalog'
+
+export async function getStaticPaths() {
+  let categories: Category[]
+  try {
+    categories = (await listCategories()).data
+  } catch {
+    // Without categories the catalog still builds. The `/` page is still there; only the
+    // category filter ends up empty. Running a build with no data is better than running a
+    // build that always fails.
+    return []
+  }
+
+  const counts = await Promise.all(
+    categories.map(async (entry) => {
+      const slug = categorySlug(entry)
+      if (!slug) return { entry, slug, totalPages: 0 }
+      // `pageSize` must be the same `PAGE_SIZE` that `CatalogView` uses, not `1`:
+      // `meta.totalPages` is computed from `total / pageSize`, so a different number yields
+      // a different page count from the one that is actually rendered.
+      const result = await listProducts({
+        page: 1,
+        pageSize: PAGE_SIZE,
+        category: entry.name,
+        locale: defaultLocale,
+      })
+      return { entry, slug, totalPages: result.meta.totalPages }
+    }),
+  )
+
+  const paths = counts.flatMap(({ entry, slug, totalPages }) =>
+    Array.from({ length: Math.min(totalPages, MAX_PAGES) }, (_, index) => {
+      const page = index + 1
+      return {
+        params: { category: slug, page: String(page) },
+        props: { page, category: entry.name, categories: counts.map((item) => item.entry) },
+      }
+    }),
+  )
+
+  return paths
+}
+
+interface Props {
+  page: number
+  category?: string
+  categories?: Category[]
+}
+
+const { page, category, categories } = Astro.props
+---
+
+<CatalogView page={page} category={category} categories={categories} />

@@ -51,7 +51,10 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm build",
     "check:workspace-glob": "node scripts/check-workspace-glob.mjs",
-    "prepack": "node scripts/copy-templates.mjs"
+    "check:plugin-config": "node scripts/check-plugin-config.mjs",
+    "prepack": "node scripts/copy-templates.mjs && node scripts/copy-license.mjs",
+    "check:generated-app": "node scripts/check-generated-app.mjs",
+    "check:code-defined-core": "node scripts/check-code-defined-core.mjs"
   },
   "dependencies": {},
   "devDependencies": {
