@@ -45,6 +45,13 @@ pnpm typecheck
 - [API reference](docs/api.md)
 - [KV settings](docs/settings.md)
 
+## What's new
+
+The `mcp` column on `_meta_collections`, added automatically on the first
+request after upgrade.
+
+See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#020--2026-09-28) for every release.
+
 ## License
 
 MIT
