@@ -77,8 +77,10 @@ pnpm dev            # http://localhost:5173 (host 0.0.0.0, also reachable via ma
 
 ## `@hamolus/*` dependencies
 
-The examples use the `^0.1.0` registry range, same as a project created by
-`hamolus create`. While the packages are still developing, point every `@hamolus/*` at a
+The examples use the `^0.2.0` registry range, same as a project created by
+`hamolus create`. The three console plugins (`@hamolus/plugin-console-*`) are still
+at `^0.1.0`; they did not change in `0.2.0` and are versioned separately. While the
+packages are still developing, point every `@hamolus/*` at a
 local checkout:
 
 ```bash

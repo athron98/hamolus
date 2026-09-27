@@ -29,10 +29,46 @@ export interface CollectionDefinition {
   softDelete?: boolean
   /** Field used as the primary key, defaults to 'id' */
   primaryKey?: string
+  /** What the MCP server may do with this collection; absent means `read`. */
+  mcp?: McpCollectionMode
   fields: FieldDefinition[]
 }
 
 export const RESERVED_COLLECTION_NAMES = ['_meta', '_auth', 'health'] as const
+
+/**
+ * How much of a collection the MCP server is allowed to touch.
+ *
+ * - `read` — the model may read records, not change them. **The default**, so a
+ *   collection that predates this key stays readable and nothing new is writable
+ *   by accident.
+ * - `write` — the model may read *and* create, update and delete.
+ * - `hide` — the model may not see the collection at all: not its definition, not
+ *   its records, and not the collection index entry.
+ *
+ * This is a *surface* policy, not an authorization one. It decides what the MCP
+ * server offers; who is allowed to write at all is still `records.write` on the
+ * caller's privilege, enforced by the core.
+ */
+export const MCP_COLLECTION_MODES = ['read', 'write', 'hide'] as const
+
+export type McpCollectionMode = (typeof MCP_COLLECTION_MODES)[number]
+
+/** The mode that applies to a definition, resolving an absent key to `read`. */
+export function collectionMcpMode(def: { mcp?: McpCollectionMode }): McpCollectionMode {
+  return def.mcp ?? 'read'
+}
+
+/**
+ * Narrow a stored column back to a mode.
+ *
+ * The write path validates the schema, so an unknown value can only come from a
+ * hand-edited row. It resolves to `read` — the documented default, and the
+ * narrower of the two modes that are not `hide`.
+ */
+export function toMcpCollectionMode(value: string | null | undefined): McpCollectionMode {
+  return MCP_COLLECTION_MODES.includes(value as McpCollectionMode) ? (value as McpCollectionMode) : 'read'
+}
 
 export const collectionDefinitionSchema = z
   .object({
@@ -47,6 +83,7 @@ export const collectionDefinitionSchema = z
     timestamps: z.boolean().optional(),
     softDelete: z.boolean().optional(),
     primaryKey: z.string().default('id'),
+    mcp: z.enum(MCP_COLLECTION_MODES).optional().describe('MCP exposure: read (default), write, or hide.'),
     fields: z.array(fieldDefinitionSchema).min(1, 'At least one field is required'),
   })
   .strict()

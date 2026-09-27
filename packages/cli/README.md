@@ -55,6 +55,14 @@ order `templates/cores/<--core>`, then `templates/cores/<--mode>`, then
 `templates/cores/basic`. The resolved name is recorded as the core's `source` in
 `hamolus.json`, so `hamolus list` can say where a core came from.
 
+## What's new
+
+Generated projects now pin `@hamolus/*` at `^0.2.0`, and `hamolus add plugin` picks
+the right range per plugin instead of assuming every `@hamolus/*` package shares a
+version.
+
+See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#020--2026-09-28) for every release.
+
 ## License
 
 MIT
