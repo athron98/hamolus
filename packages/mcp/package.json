@@ -1,6 +1,6 @@
 {
   "name": "@hamolus/mcp",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "type": "module",
   "license": "MIT",
   "author": "Gilang Albathin Nurhabibi <https://github.com/athron98>",
@@ -51,7 +51,6 @@
     "prepack": "node ../cli/scripts/copy-license.mjs"
   },
   "dependencies": {
-    "@hamolus/types": "workspace:*",
     "@modelcontextprotocol/server": "^2.1.0",
     "agents": "^0.24.0",
     "zod": "^4.6.5"

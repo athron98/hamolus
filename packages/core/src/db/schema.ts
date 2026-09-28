@@ -25,8 +25,6 @@ export const metaCollections = sqliteTable(
     timestamps: integer('timestamps', { mode: 'boolean' }).notNull().default(false),
     softDelete: integer('soft_delete', { mode: 'boolean' }).notNull().default(false),
     primaryKey: text('primary_key').notNull().default('id'),
-    /** MCP exposure: 'read' (default), 'write' or 'hide'; null means read. */
-    mcp: text('mcp'),
     /** JSON string of FieldDefinition[] */
     fields: text('fields').notNull(),
     createdAt: text('created_at')

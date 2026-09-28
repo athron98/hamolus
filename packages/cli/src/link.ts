@@ -14,7 +14,7 @@
  * cases where you are still building the packages themselves:
  *
  *   1. generating this monorepo's own `examples/cores/*`, which must exercise the core
- *      in the working tree rather than whatever the registry currently serves;
+ *      in the working tree rather than whatever 0.1.0 npm currently serves;
  *   2. trying a change in `packages/core` against a real project before publishing.
  *
  * `--link <path>` handles both: every `@hamolus/*` dependency becomes a pnpm `link:` spec
@@ -160,7 +160,7 @@ export function linkDependencies(
  *
  * `dependencies` and `devDependencies` are both covered: the console and the plugin
  * packages are ordinary dev-time workspace members in a generated project, and a leftover
- * a caret range on a dev dependency would still resolve from npm and mask the link.
+ * `^0.1.0` on a dev dependency would still resolve from npm and mask the link.
  * The file is only rewritten when something actually changed, so a manifest with no
  * scoped dependencies keeps its original mtime.
  *

@@ -23,7 +23,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import type { ParsedArgs } from '../args.js'
 import { linkManifestFile } from '../link.js'
-import { fallbackRange, resolveSource, resolveWorkspaceDependencyVersion } from '../sources.js'
+import { resolveSource, resolveWorkspaceDependencyVersion } from '../sources.js'
 import { formatLabel, resolveTemplateDirectory } from '../templates.js'
 import {
   addFromSource,
@@ -41,10 +41,11 @@ import {
 
 const PANEL_RUNTIME_PACKAGE = '@hamolus/panel'
 const TYPES_PACKAGE = '@hamolus/types'
+const DEFAULT_RUNTIME_RANGE = '^0.1.0'
 
 /**
  * Build a semver range from a concrete version, dropping any pre-release/build
- * suffix so `1.0.0-rc.1` becomes `^1.0.0` rather than an unsatisfiable pin.
+ * suffix so `0.2.0-rc.1` becomes `^0.2.0` rather than an unsatisfiable pin.
  */
 function rangeFromVersion(version: string | undefined): string | undefined {
   if (!version) return undefined
@@ -173,11 +174,8 @@ export async function runAddPanel(args: ParsedArgs): Promise<void> {
   // The generated app imports the panel runtime for its client + types, so the
   // version is pinned to a range instead of `latest`: a future breaking publish
   // must not silently change a generated project's build.
-  // Per package rather than one shared constant: these two are lockstep today, but
-  // the fallback table is the single place that knows a version, and a second copy
-  // of it in this file is a second thing to forget.
-  let runtimeRange = fallbackRange(PANEL_RUNTIME_PACKAGE)
-  let typesRange = fallbackRange(TYPES_PACKAGE)
+  let runtimeRange = DEFAULT_RUNTIME_RANGE
+  let typesRange = DEFAULT_RUNTIME_RANGE
 
   if (template) {
     files = await addFromTemplate({ context, template, destination, tokens })
@@ -192,9 +190,9 @@ export async function runAddPanel(args: ParsedArgs): Promise<void> {
     })
     files = await addFromSource({ context, sourceDirectory: source.directory, destination })
     origin = `${source.package} ${source.version ?? ''} (${source.origin})`.trim()
-    runtimeRange = rangeFromVersion(source.version) ?? fallbackRange(PANEL_RUNTIME_PACKAGE)
+    runtimeRange = rangeFromVersion(source.version) ?? DEFAULT_RUNTIME_RANGE
     const typesVersion = await resolveWorkspaceDependencyVersion(source.directory, TYPES_PACKAGE)
-    typesRange = rangeFromVersion(typesVersion) ?? fallbackRange(TYPES_PACKAGE)
+    typesRange = rangeFromVersion(typesVersion) ?? DEFAULT_RUNTIME_RANGE
     warn('No panel template found; generated a bare app from the runtime package.')
   }
 

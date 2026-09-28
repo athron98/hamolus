@@ -112,9 +112,6 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@hamolus/types':
-        specifier: workspace:*
-        version: link:../types
       '@modelcontextprotocol/server':
         specifier: ^2.1.0
         version: 2.1.0

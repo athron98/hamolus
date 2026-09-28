@@ -26,9 +26,6 @@ export interface ScopeOpt {
   colony?: string
 }
 
-/** Query string values a core route accepts. `undefined`/`null`/`''` are dropped. */
-export type Query = Record<string, string | number | boolean | undefined | null>
-
 /** Thin JSON client for the core API (`/api/*`, Bearer JWT + optional x-land/x-colony). */
 export class CoreClient {
   private readonly base: string
@@ -39,16 +36,6 @@ export class CoreClient {
 
   get readonly(): boolean {
     return this.env.MCP_READONLY === 'true'
-  }
-
-  /** Resolved core base URL including the `/api` prefix. */
-  get baseUrl(): string {
-    return this.base
-  }
-
-  /** The land/colony this server defaults to when a tool omits them. */
-  get defaultScope(): ScopeOpt {
-    return { land: this.env.CORE_LAND, colony: this.env.CORE_COLONY }
   }
 
   assertWritable(): void {
@@ -90,11 +77,7 @@ export class CoreClient {
     const colony = scope.colony !== undefined ? scope.colony : (this.env.CORE_COLONY ?? '')
     if (land) headers.set('x-land', land)
     if (colony) headers.set('x-colony', colony)
-    // FormData bodies must keep the boundary the runtime generates, so only a
-    // JSON body gets an explicit content-type.
-    if (init.body && !(init.body instanceof FormData) && !headers.has('content-type')) {
-      headers.set('content-type', 'application/json')
-    }
+    if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json')
     const res = await fetch(this.base + path, { ...init, headers })
     const raw = await res.text()
     if (!res.ok) {
@@ -111,36 +94,24 @@ export class CoreClient {
     return JSON.parse(raw) as T
   }
 
-  get<T>(path: string, q?: Query, scope?: ScopeOpt): Promise<T> {
+  get<T>(path: string, q?: Record<string, string | number | boolean | undefined | null>, scope?: ScopeOpt): Promise<T> {
     return this.request<T>(path + toQuery(q), { method: 'GET' }, scope)
   }
 
-  post<T>(path: string, body: unknown, scope?: ScopeOpt, q?: Query): Promise<T> {
-    return this.request<T>(path + toQuery(q), { method: 'POST', body: JSON.stringify(body) }, scope)
+  post<T>(path: string, body: unknown, scope?: ScopeOpt): Promise<T> {
+    return this.request<T>(path, { method: 'POST', body: JSON.stringify(body) }, scope)
   }
 
-  put<T>(path: string, body: unknown, scope?: ScopeOpt, q?: Query): Promise<T> {
-    return this.request<T>(path + toQuery(q), { method: 'PUT', body: JSON.stringify(body) }, scope)
+  put<T>(path: string, body: unknown, scope?: ScopeOpt): Promise<T> {
+    return this.request<T>(path, { method: 'PUT', body: JSON.stringify(body) }, scope)
   }
 
-  patch<T>(path: string, body: unknown, scope?: ScopeOpt, q?: Query): Promise<T> {
-    return this.request<T>(path + toQuery(q), { method: 'PATCH', body: JSON.stringify(body) }, scope)
-  }
-
-  delete<T>(path: string, scope?: ScopeOpt, q?: Query): Promise<T> {
-    return this.request<T>(path + toQuery(q), { method: 'DELETE' }, scope)
-  }
-
-  /**
-   * POST a multipart body. The core's media and file upload routes read
-   * `multipart/form-data`, which JSON bodies cannot express.
-   */
-  postForm<T>(path: string, form: FormData, scope?: ScopeOpt): Promise<T> {
-    return this.request<T>(path, { method: 'POST', body: form }, scope)
+  delete<T>(path: string, scope?: ScopeOpt): Promise<T> {
+    return this.request<T>(path, { method: 'DELETE' }, scope)
   }
 }
 
-function toQuery(q?: Query): string {
+function toQuery(q?: Record<string, string | number | boolean | undefined | null>): string {
   if (!q) return ''
   const usp = new URLSearchParams()
   for (const [k, v] of Object.entries(q)) {

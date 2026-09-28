@@ -143,9 +143,8 @@ still carries the right year and holder.
 
 ## Compatibility
 
-Hamolus is pre-1.0 and follows a strict versioning policy while it is. See
-[Releases](#releases) below for the numbers, and mark a change breaking in the
-PR when it is one.
+Hamolus is pre-1.0 and does not follow a published release policy yet, so state
+plainly in the PR whether your change is breaking.
 
 Definition shapes deserve particular care. **A definition is a row in a
 database, and it does not migrate itself.** Adding a required key is breaking for
@@ -159,50 +158,6 @@ required key:
 The same applies in reverse: a `PUT` only ever *adds* columns. Dropping,
 renaming or retyping a field is a manual D1 migration, and the docs should say so
 wherever a reader might reasonably expect the `PUT` to do it.
-
-## Releases
-
-**The six core packages ship together, at the same version number.** `@hamolus/core`,
-`@hamolus/mcp`, `@hamolus/console`, `@hamolus/panel`, `@hamolus/types` and
-`@hamolus/cli` are published in one pass. A generated project depends on several
-of them at once, so a `^0.2.0` console against a `^0.1.0` core is a shape
-mismatch waiting to happen; there is no value in a staggered release that nobody
-can install cleanly.
-
-**The console plugins under `packages/plugins/**` version independently.** They
-are a separate release train on purpose — a plugin that did not change should not
-claim to have shipped. That is also why the CLI holds a per-package fallback
-table (`FALLBACK_RANGES` in `src/sources.ts`) rather than one constant: a single
-constant hands an unchanged plugin a range for a version it was never published
-at, and the failure lands on the user's `pnpm install`, for a package name they
-never typed.
-
-**Pre-1.0, the minor bump is the breaking one.** A release that changes
-behaviour a current user depends on goes out as a minor bump. A release that only
-adds goes out as a patch. `0.2.0` is what changing the MCP write default earned.
-
-**`CHANGELOG.md` at the repository root is the public record**, in
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) form, grouped by package
-where a release touches more than one. Each package README carries a **What's
-new** pointer into it — write that line as part of the release, not afterwards,
-so a reader on npm can tell what changed without leaving the package page.
-
-**A release is a checklist, and the version lives in six places.** The pins are
-not covered by the workspace resolution, and two of them are literals in source
-rather than in a manifest, so nothing but the gate below will notice a miss:
-
-```bash
-pnpm check:package-versions   # lockstep versions, every template/example range, the CLI's
-                              # fallback table, the reported CLI/server versions, the changelog
-```
-
-Then, in order: bump the six `package.json` versions, bump the ranges in
-`templates/**`, `packages/cli/templates/**` and `examples/**`, update
-`FALLBACK_RANGES` and `CLI_VERSION` / `SERVER_VERSION`, write the changelog entry,
-`pnpm build && pnpm typecheck && pnpm -s check:package-versions`, publish
-packages before the CLI (a generated project resolves the CLI's ranges at install
-time), and tag `vX.Y.Z` on the release commit — the changelog's compare links
-resolve to that tag, and they 404 without it.
 
 ## Commit messages
 

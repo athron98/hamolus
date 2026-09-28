@@ -39,7 +39,6 @@
     "check:code-definitions": "pnpm -F @hamolus/core check:code-definitions",
     "check:code-defined-core": "pnpm -F @hamolus/cli check:code-defined-core",
     "deploy:core": "pnpm -F @hamolus/core deploy",
-    "check:package-versions": "node packages/cli/scripts/check-package-versions.mjs",
     "deploy:console": "pnpm -F @hamolus/console deploy",
     "deploy:mcp": "pnpm -F @hamolus/mcp deploy",
     "check:workspace-glob": "node packages/cli/scripts/check-workspace-glob.mjs",
