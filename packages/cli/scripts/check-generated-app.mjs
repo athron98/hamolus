@@ -328,40 +328,124 @@ try {
     readFileSync(join(project, 'hamolus.json'), 'utf8'),
   )
 
-  // 6b. One part per flag. `--console` on its own must produce a core and a console and
-  //     nothing else — the point of a flag is that it says what you want, and a `--console`
-  //     that also dragged in a site and an MCP server would be a flag nobody could use.
-  for (const [flag, expected, forbidden] of [
-    [['--console'], ['core', 'console'], ['mcp', 'site', 'panel']],
-    [['--mcp'], ['core', 'mcp'], ['console', 'site', 'panel']],
+  // 6b. One part per flag, in both spellings. `--console` must produce a console and
+  //     nothing else; `--with-console` must produce a core and a console and nothing else.
+  //     The point of a flag is that it says exactly what you want, so either way a flag
+  //     that dragged in a site and an MCP server would be one nobody could use.
+  //
+  //     Both spellings are checked because they are separate code paths, not one flag with
+  //     a switch: a change that fixed `--console` while breaking `--with-console` would
+  //     pass a gate that only tested one of them. That is not hypothetical — the two were
+  //     once the same code with a boolean, and the boolean was set from the wrong side.
+  const PART_FLAGS = [
+    { part: 'console', bare: ['--console'], with: ['--with-console'] },
+    { part: 'mcp', bare: ['--mcp'], with: ['--with-mcp'] },
+    { part: 'site', bare: ['--site', 'astro'], with: ['--with-site', 'astro'] },
     // `--panel` takes a name, so it is spelled with one. A bare `--panel` would have to
     // invent a name, and a flag that silently generates a page nobody asked for is the
     // same failure as one that adds three parts nobody asked for.
-    [['--panel', 'admin'], ['core', 'panel'], ['console', 'mcp', 'site']],
-  ]) {
-    const label = flag.join(' ')
-    const solo = join(root, `solo-${flag[0].replace('--', '')}`)
-    const created = hamolus(root, ['create', 'solo', '--link', REPO, '-o', solo, '-y', ...flag])
+    { part: 'panel', bare: ['--panel', 'admin'], with: ['--with-panel', 'admin'] },
+  ]
+  const ALL_PARTS = ['console', 'mcp', 'site', 'panel']
+
+  for (const { part, bare, with: withFlag } of PART_FLAGS) {
+    for (const [spelling, flag, expected] of [
+      ['bare', bare, [part]],
+      ['with', withFlag, ['core', part]],
+    ]) {
+      const label = flag.join(' ')
+      const out = join(root, `${spelling}-${part}`)
+      const created = hamolus(root, [
+        'create', part, '--link', REPO, '-o', out, '-y', ...flag,
+      ])
+      ok(
+        `create ${label} succeeds on its own`,
+        created.status === 0,
+        `${created.stdout}\n${created.stderr}`,
+      )
+      if (created.status !== 0) continue
+
+      const project = JSON.parse(readFileSync(join(out, 'hamolus.json'), 'utf8'))
+      const kinds = (project.parts ?? []).map((entry) => entry.kind)
+      ok(
+        `create ${label} adds exactly ${expected.join(' + ')}`,
+        expected.every((kind) => kinds.includes(kind)) && kinds.length === expected.length,
+        kinds.join(', ') || 'no parts',
+      )
+      ok(
+        `create ${label} adds none of ${
+          ALL_PARTS.filter((kind) => !expected.includes(kind)).join(', ')
+        }`,
+        ALL_PARTS.filter((kind) => !expected.includes(kind)).every((kind) => !kinds.includes(kind)),
+        kinds.join(', '),
+      )
+
+      // The part flag decides whether a core exists, and a core is a lot of things at
+      // once — a directory, a mode, two secrets and the deploy script. Reading the mode
+      // and the secrets rather than the directory alone is deliberate: a project could
+      // keep an empty `core/` and still record a mode, and a user would find out at
+      // `pnpm deploy`, not here.
+      const scripts = JSON.parse(readFileSync(join(out, 'package.json'), 'utf8')).scripts ?? {}
+      const hasCore = expected.includes('core')
+      ok(
+        `create ${label} ${hasCore ? 'records a core mode' : 'records no core mode'}`,
+        hasCore ? typeof project.mode === 'string' : project.mode === undefined,
+        String(project.mode),
+      )
+      ok(
+        `create ${label} ${hasCore ? 'has' : 'has no'} core/.dev.vars`,
+        existsSync(join(out, 'core', '.dev.vars')) === hasCore,
+      )
+      ok(
+        `create ${label} ${hasCore ? 'has' : 'has no'} a deploy script`,
+        Boolean(scripts.deploy) === hasCore,
+        Object.keys(scripts).join(', '),
+      )
+      // Only the `packages:` block counts. A substring search finds `- core-js-pure` in
+      // `onlyBuiltDependencies` — which is a dependency name, not a workspace — so it
+      // reports a core in a project that has none.
+      const workspace = readFileSync(join(out, 'pnpm-workspace.yaml'), 'utf8')
+      const globs = (workspace.match(/^packages:\n((?:[ \t]+-[^\n]*\n)+)/m)?.[1] ?? '')
+        .split('\n')
+        .map((line) => line.trim().replace(/^-\s*/, '').replace(/^['"]|['"]$/g, ''))
+      ok(
+        `create ${label} ${hasCore ? 'registers' : 'does not register'} core as a workspace`,
+        globs.includes('core') === hasCore,
+        globs.join(', '),
+      )
+
+      // A core-less project still has to start its own parts, so its `dev` cannot be the
+      // core's. And it must not name a `core/` filter that does not exist, which is the
+      // failure mode `--parallel` reports as a hard error on the first run.
+      const dev = scripts.dev ?? ''
+      ok(
+        `create ${label} runs a dev script that ${hasCore ? 'starts the core' : 'does not name a core'}`,
+        hasCore ? dev.includes('core') : !dev.includes('core'),
+        dev,
+      )
+    }
+  }
+
+  // The two spellings cannot be combined: `--console` says there is no core and
+  // `--with-mcp` says there is one, and a project that answered both is a project whose
+  // manifest and README would disagree with each other. The check is that it is refused
+  // with a reason, not merely refused — a bare "unknown option" would be a bug report.
+  {
+    const mixed = join(root, 'mixed')
+    const created = hamolus(root, [
+      'create', 'mixed', '--link', REPO, '-o', mixed, '-y', '--console', '--with-mcp',
+    ])
     ok(
-      `create ${label} succeeds on its own`,
-      created.status === 0,
+      'a bare flag mixed with a --with- flag is refused',
+      created.status !== 0,
       `${created.stdout}\n${created.stderr}`,
     )
-    if (created.status !== 0) continue
-
-    const kinds = (JSON.parse(readFileSync(join(solo, 'hamolus.json'), 'utf8')).parts ?? []).map(
-      (part) => part.kind,
-    )
     ok(
-      `create ${label} adds exactly ${expected.join(' + ')}`,
-      expected.every((kind) => kinds.includes(kind)) && kinds.length === expected.length,
-      kinds.join(', '),
+      'the refusal explains the conflict rather than saying "unknown option"',
+      /--console/.test(created.stderr) && /--with-mcp/.test(created.stderr),
+      created.stderr,
     )
-    ok(
-      `create ${label} adds none of ${forbidden.join(', ')}`,
-      forbidden.every((kind) => !kinds.includes(kind)),
-      kinds.join(', '),
-    )
+    ok('the refused mix writes nothing', !existsSync(mixed))
   }
 
   // A panel is not a process, so it must not appear in the root `dev`. A `--filter` for a
@@ -369,7 +453,7 @@ try {
   // a panel the fastest way to break `pnpm dev`.
   {
     const panelOnly = join(root, 'panel-dev')
-    hamolus(root, ['create', 'panels', '--link', REPO, '-o', panelOnly, '-y', '--panel', 'admin'])
+    hamolus(root, ['create', 'panels', '--link', REPO, '-o', panelOnly, '-y', '--with-panel', 'admin'])
     const dev = JSON.parse(readFileSync(join(panelOnly, 'package.json'), 'utf8')).scripts?.dev ?? ''
     ok(
       'a panel is left out of pnpm dev',
@@ -384,7 +468,7 @@ try {
   {
     const portProject = join(root, 'ports')
     hamolus(root, [
-      'create', 'ports', '--link', REPO, '-o', portProject, '-y', '--core', 'predefined', '--mcp',
+      'create', 'ports', '--link', REPO, '-o', portProject, '-y', '--core', 'predefined', '--with-mcp',
     ])
     const core = JSON.parse(readFileSync(join(portProject, 'core', 'package.json'), 'utf8'))
     const mcp = JSON.parse(readFileSync(join(portProject, 'mcp', 'package.json'), 'utf8'))
@@ -411,7 +495,7 @@ try {
   // testing it. Every other gate here builds a project and then adds a part with a
   // *second* `hamolus` invocation, which is why two bugs survived a green suite:
   //
-  //   - `create --console --mcp --site` was accepted, documented, and silently discarded,
+  //   - `create --with-console --with-mcp --with-site` was accepted, documented, and
   //     because `runCreate` never implemented the wizard's flags. The project came out
   //     with a core and a "hamolus add console" suggestion, and exit 0.
   //   - once that was routed through the wizard, `--output` was forwarded to the `add`
@@ -425,10 +509,10 @@ try {
   const oneShot = join(root, 'oneshot')
   const oneShotCreated = hamolus(root, [
     'create', 'oneshot', '--link', REPO, '-o', oneShot, '-y',
-    '--core', 'predefined', '--console', '--mcp', '--site', 'astro',
+    '--core', 'predefined', '--with-console', '--with-mcp', '--with-site', 'astro',
   ])
   ok(
-    'create with --console --mcp --site succeeds in one command',
+    'create with --with-console --with-mcp --with-site succeeds in one command',
     oneShotCreated.status === 0,
     `${oneShotCreated.stdout}\n${oneShotCreated.stderr}`,
   )

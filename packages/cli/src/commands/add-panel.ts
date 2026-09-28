@@ -148,6 +148,23 @@ export async function runAddPanel(args: ParsedArgs): Promise<void> {
 
   guardExisting(context, 'panel', name, destination)
 
+  // A panel is a page *inside* the console, so a project with no console has nowhere to
+  // show it: the app builds, `pnpm dev` serves it, and nobody ever loads it. `hamolus add
+  // panel` has always allowed this — a panel is genuinely a separate app that a console
+  // can be told to load — so it is a warning here rather than a refusal, which would break
+  // the legitimate order of "generate the panel app first, add the console next".
+  //
+  // The bare `--panel` flag is where it bites hardest, since it promises a project that
+  // is a panel and nothing else, and that project cannot display itself.
+  const hasConsole = context.project.parts.some((part) => part.kind === 'console')
+  if (!hasConsole && !context.dryRun) {
+    warn(
+      'This project has no console, and a panel is a page inside the console — nothing ' +
+        'will load it until there is one.\n' +
+        'Add the console with `hamolus add console`, and point both at the same core.',
+    )
+  }
+
   const tokens = panelTokens(name, context.project.scope)
 
   // A panel template (if the repo ships one) is the better source: it already knows

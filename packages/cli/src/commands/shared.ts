@@ -349,9 +349,17 @@ function devScript(parts: Project['parts']): string {
     return part ? [`--filter ./${part.path}`] : []
   })
 
+  // A project that has no core and no parts yet. `--filter ./core` used to be the
+  // fallback here, and it was a lie in exactly one case: a workspace created by
+  // `hamolus create acme --no-core`, where the filter matches no package, pnpm exits 0
+  // having started nothing, and the project looks like it works. `pnpm -r` starts
+  // whichever workspace members define a `dev` script, which is the truth until the first
+  // part lands and this function is called again with a filter to use.
+  if (filters.length === 0) return 'pnpm -r --parallel dev'
+
   // One part needs no parallelism, and `pnpm --filter ./core dev` reads better than the
   // parallel form for the project that has not added anything yet.
-  if (filters.length <= 1) return `pnpm ${filters[0] ?? '--filter ./core'} dev`
+  if (filters.length === 1) return `pnpm ${filters[0]} dev`
   return `pnpm --parallel ${filters.join(' ')} dev`
 }
 

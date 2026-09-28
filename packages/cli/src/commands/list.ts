@@ -47,15 +47,22 @@ export async function runList(_args: ParsedArgs): Promise<void> {
     return
   }
 
-  heading(`${project.name}  ${dim(`(${project.mode})`)}`)
+  // A project with no core has no mode to report. Printing `undefined` — or, worse,
+  // `independent` — would claim a tenancy for a core that was never generated, so the
+  // header says what the project *is* instead.
+  const hasCore = project.parts.some((part) => part.kind === 'core')
+  heading(hasCore ? `${project.name}  ${dim(`(${project.mode})`)}` : `${project.name}  ${dim('(no core)')}`)
   info(`scope ${project.scope} · created ${project.createdAt.slice(0, 10)}`)
   // The two answers a generated part has to inherit rather than guess: which address
   // the dev servers answer on, and which scope a bare request lands in. They are
   // optional because a project created before they existed simply has no such key.
   const facts = [`dev ${project.devHost ?? '127.0.0.1'}`]
-  if (project.mode !== 'independent') {
+  // Only for a core. A project whose `mode` is absent has nothing routing bare requests,
+  // and reporting a land for it would be the one line on this screen that is not true.
+  if (hasCore && project.mode !== 'independent') {
     facts.push(`land ${project.land ?? 'default'}`, `colony ${project.colony ?? 'default'}`)
   }
+  if (!hasCore) facts.push('core lives elsewhere — each part is told where at runtime')
   info(facts.join(' · '))
 
   for (const kind of KIND_ORDER) {

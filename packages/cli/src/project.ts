@@ -56,7 +56,15 @@ export interface Project {
   name: string
   /** Package scope used for generated workspace members, e.g. `@acme`. */
   scope: string
-  mode: CoreMode
+  /**
+   * Tenancy of the project's core.
+   *
+   * Optional, and absent on a project created without a core: `--console` and the other
+   * bare part flags ask for a project that *is* one part, so there is no core whose
+   * tenancy there is anything to record. Readers must treat it as "no core" rather than
+   * defaulting it, or a core-less project would warn about a land it has no core to route.
+   */
+  mode?: CoreMode
   /**
    * Absolute path of the Hamolus checkout this project links its `@hamolus/*`
    * dependencies into, when it was created or updated with `--link`.

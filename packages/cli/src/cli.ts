@@ -70,6 +70,10 @@ const WIZARD_OPTIONS = [
   'mcp',
   'site',
   'panel',
+  'withConsole',
+  'withMcp',
+  'withSite',
+  'withPanel',
 ] as const
 
 function wizardFlags(args: ParsedArgs): boolean {

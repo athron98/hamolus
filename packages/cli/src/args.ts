@@ -18,6 +18,14 @@
 import { parseArgs } from 'node:util'
 import { CORE_MODES, type CoreMode } from './help.js'
 
+/**
+ * The parts that can be requested by a flag, bare or `--with-`.
+ *
+ * A list rather than a union of one, because `--console --mcp` asks for two of them in a
+ * project that has no core, and the generated README has to describe both.
+ */
+export type PartFlag = 'console' | 'mcp' | 'site' | 'panel'
+
 export interface ParsedArgs {
   /**
    * Positional words *after* the command, e.g. `['panel', 'shop_ops']` for
@@ -71,21 +79,43 @@ export interface ParsedArgs {
     land?: string
     /** Colony the bare requests of a multi-tenant core resolve to. */
     colony?: string
-    /** `init` only: add a console, skipping the question. */
+    /** `init` only: this project is a console, and nothing else. No core. */
     console?: boolean
-    /** `init` only: add an MCP server, skipping the question. */
+    /** `init` only: this project is an MCP server, and nothing else. No core. */
     mcp?: boolean
-    /** `init` only: add a site from this template (`astro`, `nextjs`, or a path). */
+    /** `init` only: this project is a site from this template, and nothing else. */
     site?: string
-    /**
-     * `init` only: add a panel of this name, skipping the question.
-     *
-     * A value rather than a boolean, unlike `--console` and `--mcp`: a panel is a page
-     * inside the console and `hamolus add panel` needs a name to build one, so there is
-     * no name for a bare `--panel` to default to that would not be a lie about what was
-     * asked for.
-     */
+    /** `init` only: this project is a panel of this name, and nothing else. */
     panel?: string
+    /** `init` only: a core, plus a console. */
+    withConsole?: boolean
+    /** `init` only: a core, plus an MCP server. */
+    withMcp?: boolean
+    /** `init` only: a core, plus a site from this template (`astro`, `nextjs`, a path). */
+    withSite?: string
+    /** `init` only: a core, plus a panel of this name. */
+    withPanel?: string
+    /**
+     * `create` only: write the project workspace and nothing else — no core, and so no
+     * core secrets, no core template and no `deploy` script.
+     *
+     * This is the primitive the bare part flags are built on. `hamolus create acme
+     * --console` goes through the wizard, which runs this and then `hamolus add console`,
+     * so the core-less project is assembled by the same commands a person would type by
+     * hand rather than by a second copy of the scaffolding.
+     */
+    noCore?: boolean
+    /**
+     * What a core-less project is for, e.g. `['console']` — the parts `--no-core` is being
+     * used to make room for.
+     *
+     * Internal: not a flag, and not in {@link OPTIONS}. The wizard is the only caller,
+     * and it already knows the answer because it is the thing that read `--console`. It
+     * exists so the generated README can say which parts this project is rather than
+     * describing a project that is nothing yet — a README is written once, by `create`,
+     * while the parts are added after it.
+     */
+    partHint?: PartFlag[]
   }
 }
 
@@ -103,10 +133,30 @@ const OPTIONS = {
   host: { type: 'string' },
   land: { type: 'string' },
   colony: { type: 'string' },
+  // Two spellings of the same four parts, and the difference between them is whether the
+  // project gets a core:
+  //
+  //   --console          this project *is* a console
+  //   --with-console     this project is a core *and* a console
+  //
+  // The bare flag is the narrower promise, so it is the one that reads as the fact. Asking
+  // for a console with `--console` and getting a core you did not ask for is the same class
+  // of bug as a flag that is accepted and then ignored: the command answers a different
+  // question than the one that was asked. `--with-` is there for the case where the core is
+  // wanted, and it says so out loud rather than leaving the reader to infer it from an
+  // absence.
+  //
+  // The two spellings cannot be mixed. `--console --with-mcp` asks for a project with no
+  // core and a project with one; see `resolveParts` in commands/init.ts.
   console: { type: 'boolean' },
   mcp: { type: 'boolean' },
   site: { type: 'string' },
   panel: { type: 'string' },
+  'with-console': { type: 'boolean' },
+  'with-mcp': { type: 'boolean' },
+  'with-site': { type: 'string' },
+  'with-panel': { type: 'string' },
+  'no-core': { type: 'boolean' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   clear: { type: 'boolean' },
@@ -167,6 +217,11 @@ export function parse(argv: string[]): ParsedArgs {
       mcp: parsed.values.mcp,
       site: parsed.values.site,
       panel: parsed.values.panel,
+      withConsole: parsed.values['with-console'],
+      withMcp: parsed.values['with-mcp'],
+      withSite: parsed.values['with-site'],
+      withPanel: parsed.values['with-panel'],
+      noCore: parsed.values['no-core'],
     },
   }
 }

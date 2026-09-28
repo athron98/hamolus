@@ -12,7 +12,45 @@ Nothing yet.
 
 ## [0.2.3] — 2026-09-28
 
+### Added
+
+- **Part flags come in two spellings: `--console` and `--with-console`.** The bare
+  flag is `hamolus add <part>` applied to a new project, so it makes *only* that part and
+  no core. `--with-<part>` is the whole project — a core, its mode, its land and colony,
+  `core/.dev.vars` and a `deploy` script. Before this, `--console` meant "core and
+  console", which left no way to scaffold a part that belongs to a core somebody else runs:
+  a second checkout, a shared staging core, or a console for a client's core. Same for
+  `--mcp`, `--site` and `--panel`.
+- **A project can be created with no core at all.** `--no-core` runs the wizard without
+  the five core questions, so the project has no `core/`, no `mode`, no land or colony, no
+  `.dev.vars` and no `deploy` script, and its `pnpm-workspace.yaml` does not list a `core`
+  glob. `Project['mode']` became optional to match, and `hamolus list` labels such a
+  project `(no core)` rather than pretending otherwise.
+- **Core-less parts find their core at runtime instead of at build time.** The console
+  asks for the endpoint in its navbar, an MCP server reads `CORE_API_URL`, a site reads
+  `PUBLIC_HAMOLUS_ORIGIN` (`HAMOLUS_API_ORIGIN` on Next.js), and a panel is loaded by a
+  console that already knows. So one build works against a preview, staging or production
+  core with no rebuild, which is the whole reason not to bake the address in.
+- **`hamolus add panel` warns when the project has no console.** A panel is a page inside
+  the console, so it builds, serves, and is never loaded. It is a warning and not a
+  refusal, because "generate the panel app, add the console next" is a legitimate order.
+
+### Changed
+
+- **Mixing a bare part flag with a `--with-` one is refused**, with a message naming both
+  flags, rather than accepted and silently resolved one way.
+- `hamolus init --help` and the root README document both spellings, and say that
+  questions 2 to 6 are skipped when there is no core.
+
 ### Fixed
+
+- **`--console` was briefly read as `--with-console`.** The flag lookup capitalised the
+  first letter unconditionally, so with an empty prefix it asked for a `Console` key that
+  does not exist, read nothing, and fell through to "no flags given" — the default, which
+  is a core. Every bare flag was therefore a `--with-` flag, and the two bugs in that one
+  function were invisible to `tsc` because the key lookup is cast. Both spellings are now
+  generated separately in `check:generated-app`, because a gate that tested only one of
+  them would have passed this.
 
 - **`hamolus create <name> --console --mcp --site` no longer throws the flags away.**
   The three optional parts are the wizard's questions, and `runCreate` never implemented
@@ -259,7 +297,9 @@ pnpm up "@hamolus/*@^0.2.0"
 After that, review your collections' `mcp` mode — any collection an agent was
 writing to needs `mcp: 'write'`.
 
-[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/hamolus-labs/hamolus/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/hamolus-labs/hamolus/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/hamolus-labs/hamolus/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/hamolus-labs/hamolus/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hamolus-labs/hamolus/releases/tag/v0.1.0

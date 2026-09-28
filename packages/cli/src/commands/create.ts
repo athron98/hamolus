@@ -23,7 +23,7 @@
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import type { ParsedArgs } from '../args.js'
+import type { ParsedArgs, PartFlag } from '../args.js'
 import type { CoreMode } from '../help.js'
 import { linkManifestFile, resolveLinkRoot } from '../link.js'
 import { generateSecret } from '../prompt.js'
@@ -120,6 +120,19 @@ export interface CreateOptions {
   key?: string
   /** Hamolus checkout to `@hamolus/*` link into, from `--link`. */
   link?: string
+  /**
+   * Write the workspace without a core — the project the bare part flags describe.
+   *
+   * A core is the default because it is the part everything else talks to, and a project
+   * that cannot answer a request is not much of a project. But `hamolus create acme
+   * --console` asks for a project that *is* a console, pointed at a core that already runs
+   * somewhere else, and answering that with a generated core would be inventing a part the
+   * caller did not ask for. So the parts decide, and this is what "no core" means when
+   * they do.
+   */
+  noCore: boolean
+  /** What a core-less project is for; see `ParsedArgs['options']['partHint']`. */
+  partHint?: PartFlag[]
   force: boolean
   dryRun: boolean
 }
@@ -202,6 +215,32 @@ export function parseCreateOptions(args: ParsedArgs): CreateOptions {
   assertSecret('--jwt', args.options.jwt)
   assertSecret('--key', args.options.key)
 
+  // The flags that only exist to configure a core are refused rather than ignored here.
+  // `--no-core` is a `create` flag, so it is reachable directly, and `hamolus create acme
+  // --no-core --mode bridge` would otherwise write a workspace whose every core setting
+  // describes a Worker that is not being generated. The wizard never produces this pair —
+  // it decides the core before it reaches this point — so the check costs one line and
+  // turns a silently-wrong project into an error.
+  if (args.options.noCore) {
+    const coreOnly = [
+      ['--mode', args.options.mode],
+      ['--core', args.options.core],
+      ['--core-name', args.options.coreName],
+      ['--land', args.options.land],
+      ['--colony', args.options.colony],
+      ['--jwt', args.options.jwt],
+      ['--key', args.options.key],
+    ].filter(([, value]) => value !== undefined)
+    if (coreOnly.length > 0) {
+      const names = coreOnly.map(([name]) => name).join(', ')
+      throw new Error(
+        `Cannot combine --no-core with ${names}: those configure a core, and --no-core ` +
+          'means this project has none.\n' +
+          'Drop --no-core to get a core, or drop the core flags to get just the workspace.',
+      )
+    }
+  }
+
   const output = args.options.output
     ? resolve(process.cwd(), args.options.output)
     : resolve(process.cwd(), name)
@@ -218,6 +257,8 @@ export function parseCreateOptions(args: ParsedArgs): CreateOptions {
     jwt: args.options.jwt,
     key: args.options.key,
     link: args.options.link,
+    noCore: args.options.noCore ?? false,
+    partHint: args.options.partHint,
     force: args.flags.force,
     dryRun: args.flags.dryRun,
   }
@@ -260,16 +301,19 @@ function projectTokens(options: CreateOptions): Record<string, string> {
   }
 }
 
-const WORKSPACE_GLOBS = [
-  'core',
-  'core/scripts',
-  'console',
-  'configs/*',
-  'panels/*',
-  'mcp',
-  'seeds/*',
-  'site',
-].join('\n')
+/**
+ * Workspace globs, minus the core's when there is no core.
+ *
+ * A glob that matches no directory is not an error — pnpm ignores it — so listing `core`
+ * for a core-less project would be harmless. It is dropped anyway because the file is the
+ * first thing anyone reads to see what a project contains, and a `core` entry on a project
+ * with no core is a statement about the project that is false.
+ */
+const CORE_GLOBS = ['core', 'core/scripts']
+const PART_GLOBS = ['console', 'configs/*', 'panels/*', 'mcp', 'seeds/*', 'site']
+
+const workspaceGlobs = (noCore: boolean): string =>
+  [...(noCore ? [] : CORE_GLOBS), ...PART_GLOBS].join('\n')
 
 /**
  * Transitive dependencies whose install scripts this project trusts.
@@ -288,8 +332,8 @@ const WORKSPACE_GLOBS = [
  */
 const TRUSTED_BUILD_SCRIPTS = ['esbuild', 'workerd', 'sharp', 'unrs-resolver', 'core-js-pure']
 
-function workspaceManifest(): string {
-  const globs = WORKSPACE_GLOBS.split('\n')
+function workspaceManifest(noCore: boolean): string {
+  const globs = workspaceGlobs(noCore).split('\n')
     .map((glob) => `  - '${glob}'`)
     .join('\n')
   const allowed = TRUSTED_BUILD_SCRIPTS.map((name) => `  - ${name}`).join('\n')
@@ -319,10 +363,19 @@ const ROOT_PACKAGE = (options: CreateOptions): string =>
       scripts: {
         // Matches what `devScript()` derives for a project holding only its core, so the
         // first `hamolus add` changes the list rather than the spelling.
-        dev: 'pnpm --filter ./core dev',
+        //
+        // With no core there is nothing to point at yet, and `--filter ./core` would be a
+        // filter matching no package — pnpm exits 0 having started nothing, which reads as
+        // a project that works. `-r` is the honest form for a shell that is about to gain
+        // its parts: it starts whichever of them define a `dev` script, and `commit`
+        // narrows it to an explicit list as soon as the first one lands.
+        dev: options.noCore ? 'pnpm -r --parallel dev' : 'pnpm --filter ./core dev',
         build: 'pnpm -r build',
         typecheck: 'pnpm -r typecheck',
-        deploy: 'pnpm -F ./core deploy',
+        // Deploying *is* deploying the core, so a project without one has nothing to
+        // deploy. Leaving the script in would make `pnpm deploy` a no-op that exits 0 —
+        // and the generated README points at a core that is not there.
+        ...(options.noCore ? {} : { deploy: 'pnpm -F ./core deploy' }),
       },
       devDependencies: {
         typescript: '~5.9.0',
@@ -363,7 +416,38 @@ dist/
 .DS_Store
 `
 
+/**
+ * `.env.example` for a project that has no core.
+ *
+ * Every value the full version carries belongs to the core: the two secrets sign sessions
+ * the core verifies, `PUBLIC_GETS` and the land/colony triple are read by the core's
+ * Worker, and `DEV_HOST` is the address the core binds. None of them are read by a console,
+ * an MCP server, a panel or a site — each of those finds its core over HTTP instead, at a
+ * URL the person supplies. So the file says where the core lives and stops, rather than
+ * shipping nine `change-me` values that no process in the project would ever look at.
+ *
+ * `ADMIN_KEY` is the exception worth keeping: the console asks for it at sign-in, so
+ * knowing which core it belongs to matters even though the project does not store it.
+ */
+const ENV_EXAMPLE_NO_CORE = `# This project has no core.
+
+A part generated on its own — a console, an MCP server, a panel, a site — talks to a core
+that already runs somewhere else, and each one is told where at runtime:
+
+  console   asks for the API endpoint in its navbar, and remembers it per browser
+  mcp       reads CORE_API_URL from mcp/.env
+  site      reads PUBLIC_HAMOLUS_ORIGIN from site/.env (HAMOLUS_API_ORIGIN on Next.js)
+  panel     a page inside the console, which already knows the core
+
+Nothing here is read by Wrangler, because there is no Worker in this project. Copy this
+file to .env if a part you add reads one of the names above.
+
+# Which core the console signs in to.
+ADMIN_KEY=
+`
+
 function envExample(options: CreateOptions): string {
+  if (options.noCore) return ENV_EXAMPLE_NO_CORE
   return [
     '# Shared secrets for this Hamolus project.',
     '# Put real values in core/.dev.vars (git-ignored) or as Wrangler secrets.',
@@ -434,6 +518,109 @@ function devVars(options: CreateOptions): string {
  * name, so a repository's own template that ships a `src/collections` barrel is
  * described the same way the shipped ones are.
  */
+/**
+ * README for a project with no core.
+ *
+ * The full version leads with the core mode, the core template and `core/.dev.vars` —
+ * three sections describing a directory that is not here. What a core-less project does
+ * have is the part it was created for, and the fact that it needs a core from somewhere
+ * else. That is the whole document: where the part points, and what to do next.
+ */
+const README_NO_CORE = (options: CreateOptions, parts: PartFlag[]): string => {
+  // `--console` and `--console --mcp` are both valid, so the sentence and the flag list
+  // are both built from the parts rather than from the first one. Reading the first part
+  // off a two-part project would produce a README that describes half of it.
+  const named_ = parts.map((part) => CORE_LESS_PARTS[part])
+  const phrase = listPhrase(named_.map((entry) => entry.phrase))
+  const withFlag = named_.map((entry) => entry.withFlag).join(' ')
+  return `# ${formatLabel(options.name)}
+
+A [Hamolus](https://github.com/hamolus-labs/hamolus) project created with
+\`hamolus create ${options.name}\`.
+
+This project is **${phrase}**, with no core of its own. It talks to a core that already runs
+somewhere else, and finds that core at runtime rather than compiling its address in — so
+the same build works against a preview, staging or production core without a rebuild.
+
+## Point it at a core
+
+${named_.map((entry) => `- ${entry.addressing}`).join('\n')}
+
+## Want the core in this project as well?
+
+A core is not a part you add afterwards: it is a project in its own right, because it owns
+the database, the buckets and the secrets. So it is a second command, either beside this one
+or in it:
+
+\`\`\`bash
+# beside it — a separate project, which is what this one already assumes
+hamolus create ${options.name}-core
+
+# in it — the core, plus the ${phrase} this project already has
+hamolus create ${options.name}-full ${withFlag}
+\`\`\`
+
+## Dev
+
+\`pnpm dev\` starts whatever this project has that runs. \`hamolus add <part>\` adds
+another part.
+
+\`\`\`bash
+pnpm install
+pnpm dev
+\`\`\`
+`
+}
+
+/**
+ * One entry per part that can be a whole project: how to read it, how it is told where the
+ * core is, and the `--with-` flag that would have produced the same project *with* a core.
+ *
+ * One table rather than three, because the three answers have to agree: a README that says
+ * "an MCP server" and then suggests `--with-console` is worse than one that says nothing.
+ */
+/**
+ * How each part is told where its core is, one line per part.
+ *
+ * Shared with the closing message `init` prints, because that message used to describe
+ * every part regardless of which ones the project actually had: a panel-only project was
+ * told to set `PUBLIC_HAMOLUS_ORIGIN` for a `site/` that did not exist.
+ */
+export function partAddressing(parts: PartFlag[]): string[] {
+  return parts.map((part) => CORE_LESS_PARTS[part].addressing)
+}
+
+/** `a console`, `an MCP server and a site` — the list as a person would say it. */
+function listPhrase(entries: string[]): string {
+  if (entries.length === 0) return 'a workspace with no parts yet'
+  if (entries.length === 1) return entries[0]!
+  return `${entries.slice(0, -1).join(', ')} and ${entries.at(-1)}`
+}
+
+export const CORE_LESS_PARTS = {
+  console: {
+    phrase: 'a console',
+    addressing: 'The console asks for the API endpoint in its navbar and remembers it per browser.',
+    withFlag: '--with-console',
+  },
+  mcp: {
+    phrase: 'an MCP server',
+    addressing:
+      'Set `CORE_API_URL` in `mcp/.env` to the core\'s `/api` base, and `MCP_BEARER_TOKEN` to a scoped user token.',
+    withFlag: '--with-mcp',
+  },
+  site: {
+    phrase: 'a site',
+    addressing: 'Set `PUBLIC_HAMOLUS_ORIGIN` in `site/.env` (`HAMOLUS_API_ORIGIN` on Next.js) to the core\'s origin.',
+    withFlag: '--with-site',
+  },
+  panel: {
+    phrase: 'a panel',
+    addressing: 'A panel is a page inside the console, which already knows which core it is talking to.',
+    withFlag: '--with-panel',
+  },
+} as const satisfies Record<PartFlag, { phrase: string; addressing: string; withFlag: string }>
+
 const PROJECT_README = (
   options: CreateOptions,
   core: { template: string; codeDefinitions: boolean },
@@ -521,13 +708,21 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
   const tokens = projectTokens(options)
   const relativeCore = 'core'
 
-  const template = await resolveCoreTemplate(options)
+  // Resolved only when there is a core to resolve a template for. A core-less project
+  // never looks at `templates/cores`, which also means it cannot fail on a missing or
+  // renamed core template — a console is not interested in which schema a core would have
+  // shipped with.
+  const template = options.noCore ? undefined : await resolveCoreTemplate(options)
   const link = await resolveLinkRoot(options.link)
 
   if (options.dryRun) {
     info(`Dry run — nothing written. Planned output in ${options.output}:`)
-    step(`${dim('template')} ${template.origin}: ${template.directory}`)
-    step(`${dim('core')}    ${relativeCore}/  (${options.coreName}, ${options.mode})`)
+    if (template) {
+      step(`${dim('template')} ${template.origin}: ${template.directory}`)
+      step(`${dim('core')}    ${relativeCore}/  (${options.coreName}, ${options.mode})`)
+    } else {
+      step(`${dim('core')}    none — the workspace only`)
+    }
     step(`${dim('root')}    package.json, pnpm-workspace.yaml, ${PROJECT_FILE}, .gitignore, .env.example, README.md`)
     if (options.jwt || options.key) step(`${dim('secrets')}  core/.dev.vars`)
     if (link) step(`${dim('link')}     @hamolus/* → ${link.packages}`)
@@ -536,26 +731,31 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
 
   await mkdir(options.output, { recursive: true })
 
-  const copied = await copyTemplate(template.directory, join(options.output, relativeCore), tokens, {
-    force: options.force,
-  })
+  // `template` is only undefined for a core-less project, and a core-less project has no
+  // core directory to copy into — the two facts are the same fact, so the narrowing below
+  // is the compiler agreeing rather than a second guess.
+  const copied = template
+    ? await copyTemplate(template.directory, join(options.output, relativeCore), tokens, {
+        force: options.force,
+      })
+    : { files: 0, written: [] as string[] }
 
   // Written after the core, because it belongs next to the core's `wrangler.jsonc` and
   // has to be replaced rather than merged when `--force` regenerates over it.
   const withSecrets = Boolean(options.jwt || options.key)
-  if (withSecrets) {
+  if (withSecrets && template) {
     await writeFile(join(options.output, relativeCore, '.dev.vars'), devVars(options), 'utf8')
   }
 
-  const linked = link
-    ? await linkManifestFile(join(options.output, relativeCore, 'package.json'), link)
-    : []
+  const linked =
+    link && template
+      ? await linkManifestFile(join(options.output, relativeCore, 'package.json'), link)
+      : []
 
   const project: Project = {
     version: PROJECT_FILE_VERSION,
     name: options.name,
     scope: scopeFor(options.name),
-    mode: options.mode,
     createdAt: now(),
     updatedAt: now(),
     // Recorded so `hamolus add console|mcp|panel` links the same checkout instead of
@@ -564,45 +764,74 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
     // A part added later inherits the answers `create` already settled, so a project
     // created to be reachable over the LAN does not lose that on its second part.
     devHost: options.host,
-    ...(options.mode === 'independent' ? {} : { land: options.land, colony: options.colony }),
-    parts: [
-      {
-        kind: 'core',
-        id: options.name,
-        label: `${formatLabel(options.name)} core`,
-        path: relativeCore,
-        // The template that was actually copied, so `hamolus list` can say where the
-        // core came from — `--core predefined` and a mode override are both different
-        // directories, and reporting `basic` for either would be a lie.
-        source: template.source,
-        generatedAt: now(),
-      },
-    ],
+    // Tenancy, land and colony are properties of a core. On a project that has none they
+    // are left out rather than defaulted: `mode: independent` on a core-less project
+    // would be read by `hamolus list` and by `add site` as a core that exists and is
+    // single-tenant, and the first thing either would then say is a warning about a land
+    // there is nothing to route.
+    ...(options.noCore
+      ? {}
+      : { mode: options.mode, ...(options.mode === 'independent' ? {} : { land: options.land, colony: options.colony }) }),
+    parts: template
+      ? [
+          {
+            kind: 'core',
+            id: options.name,
+            label: `${formatLabel(options.name)} core`,
+            path: relativeCore,
+            // The template that was actually copied, so `hamolus list` can say where the
+            // core came from — `--core predefined` and a mode override are both different
+            // directories, and reporting `basic` for either would be a lie.
+            source: template.source,
+            generatedAt: now(),
+          },
+        ]
+      : [],
   }
 
   await writeFile(join(options.output, 'package.json'), ROOT_PACKAGE(options), 'utf8')
-  await writeFile(join(options.output, 'pnpm-workspace.yaml'), workspaceManifest(), 'utf8')
+  await writeFile(join(options.output, 'pnpm-workspace.yaml'), workspaceManifest(options.noCore), 'utf8')
   await writeProject(options.output, project)
   await writeFile(join(options.output, '.gitignore'), GITIGNORE, 'utf8')
   await writeFile(join(options.output, '.env.example'), envExample(options), 'utf8')
   await writeFile(
     join(options.output, 'README.md'),
-    PROJECT_README(options, {
-      template: template.source,
-      // A `src/collections` barrel is what a code-defined schema looks like on disk,
-      // and it is the one file whose presence decides the wording above.
-      codeDefinitions: copied.written.some((path) =>
-        path.endsWith(join('src', 'collections', 'index.ts')),
-      ),
-    }),
+    options.noCore
+      ? README_NO_CORE(options, options.partHint ?? [])
+      : PROJECT_README(options, {
+          template: template!.source,
+          // A `src/collections` barrel is what a code-defined schema looks like on disk,
+          // and it is the one file whose presence decides the wording above.
+          codeDefinitions: copied.written.some((path) =>
+            path.endsWith(join('src', 'collections', 'index.ts')),
+          ),
+        }),
     'utf8',
   )
   // Packages generated by the CLI ship self-contained tsconfigs, but your own code
   // needs a base to extend, exactly like the Hamolus monorepo has.
   await writeFile(join(options.output, 'tsconfig.base.json'), tsconfigBase(), 'utf8')
 
+  if (options.noCore) {
+    success(`Created ${formatLabel(options.name)} — no core in ${options.output}`)
+    info(`parts: none yet — this is the workspace ${listPhrase((options.partHint ?? []).map((part) => CORE_LESS_PARTS[part].phrase))} is added into`)
+    step(`${dim('dev')}     ${options.host === DEFAULT_DEV_HOST ? 'localhost only' : options.host}`)
+
+    if (link) {
+      info(`link: @hamolus/* → ${link.packages} (applied by the parts you add)`)
+    }
+
+    next([
+      `cd ${options.name}`,
+      'pnpm install',
+      ...(options.partHint ?? []).map((part) => `hamolus add ${part === 'console' ? 'console' : part}`),
+      ...(link ? [] : ['# not published yet? re-link the checkout:', 'hamolus link <path-to-hamolus>']),
+    ])
+    return
+  }
+
   success(`Created ${formatLabel(options.name)} (${options.mode}) in ${options.output}`)
-  info(`core: ${copied.files} files from ${template.origin}`)
+  info(`core: ${copied.files} files from ${template!.origin}`)
   step(`${dim('dev')}     ${options.host === DEFAULT_DEV_HOST ? 'localhost only' : options.host}`)
 
   if (withSecrets) {

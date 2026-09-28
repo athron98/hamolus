@@ -37,7 +37,7 @@ pnpm dev                      # every part, in parallel
 flag, and a question whose flag you pass is not asked. So a project is one line:
 
 ```bash
-hamolus init acme --mode centralized --land acme --console --mcp --site nextjs
+hamolus init acme --mode centralized --land acme --with-console --with-mcp --with-site nextjs
 ```
 
 and `hamolus create acme` plus a few `hamolus add` calls is the same project, written out.
@@ -54,8 +54,37 @@ hamolus add configuration basic
 Each flag adds that part and nothing else, so a project is one line:
 
 ```bash
-npm create hamolus@latest acme --console --mcp --site nextjs
+npm create hamolus@latest acme --with-console --with-mcp --with-site nextjs
 ```
+
+### `--console` or `--with-console`
+
+Every part flag has two spellings, and the difference is whether you get a core.
+
+```bash
+hamolus create acme --with-console          # a core and a console
+hamolus create acme --console               # a console, and no core
+```
+
+`--with-` is the whole project: a core, its mode, its land and colony, `core/.dev.vars` with
+a generated `JWT_SECRET` and `ADMIN_KEY`, and a `deploy` script. The bare flag is
+`hamolus add console` applied to a new project, so you get **only** the console. It has no
+`core/`, no secrets and no `mode`, and it talks to a core that already runs somewhere else —
+at runtime, not compiled in, so the same build works against a preview or a production core
+without being rebuilt. The console asks for the endpoint in its navbar; an MCP server reads
+`CORE_API_URL` from `mcp/.env`; a site reads `PUBLIC_HAMOLUS_ORIGIN` from `site/.env`.
+
+The bare spelling composes, so a workspace of parts is still one line:
+
+```bash
+hamolus create acme-console --console --mcp      # no core
+hamolus create acme --with-console --with-mcp   # a core, and both
+```
+
+Mixing the two spellings is refused, because `--console` says there is no core and
+`--with-mcp` says there is one. A panel is a page *inside* the console, so
+`--panel admin` on its own builds fine and displays nothing — `hamolus add panel` warns, and
+`--with-panel admin` is usually what you want.
 
 `hamolus list` shows what a project contains and where each part came from.
 

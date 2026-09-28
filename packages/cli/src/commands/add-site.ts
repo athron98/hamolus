@@ -163,7 +163,10 @@ export async function runAddSite(args: ParsedArgs): Promise<void> {
   // so neither is a bug to fix in the site. They are called out here because the first
   // symptom the site author meets is an empty page, and nothing in the generated code
   // points at the cause.
-  if (context.project.mode !== 'independent') {
+  // Only a core decides this. `mode` is absent on a project created without one, and
+  // `undefined !== 'independent'` is true, so the old check warned every core-less site
+  // about a `PUBLIC_GETS` flag and a land that exist in a Worker this project does not have.
+  if (context.project.mode !== undefined && context.project.mode !== 'independent') {
     if (!context.project.land) {
       warn(
         'A multi-tenant core resolves bare requests to its default land. A site reads ' +

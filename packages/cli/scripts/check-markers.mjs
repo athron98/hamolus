@@ -346,7 +346,7 @@ try {
   // the generated files differed. These assertions read those files.
   {
     const dir = project('wizard')
-    const out = run(dir, ['init', 'acme', '--yes', '--console', '--mcp', '--site', 'nextjs'])
+    const out = run(dir, ['init', 'acme', '--yes', '--with-console', '--with-mcp', '--with-site', 'nextjs'])
     ok('init --yes succeeds with no terminal', out.status === 0, `${out.stdout}\n${out.stderr}`)
 
     const app = join(dir, 'acme')
@@ -415,7 +415,7 @@ try {
     const lan = project('wizard-lan')
     const lanOut = run(lan, [
       'init', 'wide', '--yes', '--host', '0.0.0.0', '--mode', 'centralized',
-      '--land', 'acme', '--colony', 'jakarta', '--core', 'predefined', '--site', 'astro',
+      '--land', 'acme', '--colony', 'jakarta', '--core', 'predefined', '--with-site', 'astro',
     ])
     ok('init with a multi-tenant mode succeeds', lanOut.status === 0, `${lanOut.stdout}\n${lanOut.stderr}`)
     const wide = join(lan, 'wide')
@@ -459,12 +459,12 @@ try {
     // and caps the name at 63 characters, `add site` requires `snake_case` and caps it at
     // 64. The wizard derives the default site id from the project name and never asks,
     // so both differences have to be absorbed here — otherwise `hamolus init my-project
-    // --site astro` wrote a core, a project manifest and a `.dev.vars`, and *then* failed
+    // --with-site astro` wrote a core, a manifest and a `.dev.vars`, and *then* failed
     // on a name the user never typed. Both cases below are silent until the last step,
     // which is the worst moment to learn a name is invalid.
     {
       const dir = project('wizard-hyphen')
-      const out = run(dir, ['init', 'my-project', '--yes', '--site', 'astro'])
+      const out = run(dir, ['init', 'my-project', '--yes', '--with-site', 'astro'])
       ok(
         'a hyphenated project name yields a site part that hamolus add site accepts',
         out.status === 0,
@@ -478,7 +478,7 @@ try {
       // 63 characters — the longest a project name may be — plus a 5-character suffix.
       const dir = project('wizard-long')
       const long = `a${'b'.repeat(62)}`
-      const out = run(dir, ['init', long, '--yes', '--site', 'nextjs'])
+      const out = run(dir, ['init', long, '--yes', '--with-site', 'nextjs'])
       ok(
         'a project name at the length limit still yields a valid site id',
         out.status === 0,
