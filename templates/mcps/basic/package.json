@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hamolus/mcp": "^0.1.0"
+    "@hamolus/mcp": "^0.2.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260920.0",
