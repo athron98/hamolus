@@ -62,6 +62,17 @@ const SEED_README = (name: string): string => `# ${formatLabel(name)} — seed
 A self-cleaning seed script. It talks to a running core over HTTP; no build step and
 no dependencies.
 
+## What it seeds
+
+The \`basic\` seed creates an \`articles\` collection, because that is the one the generated
+site templates read — it requests \`articles\` by that exact name. Four articles come
+with it, one of them a draft, so the site's \`status = published\` filter has something to
+leave out. A second \`basic_notes\` collection is there as a plain example of adding one
+more.
+
+Edit the \`collections\` array in \`index.mjs\` to change the shape. Everything a seed
+owns is named in that file, which is what makes the next section possible.
+
 ## Run
 
 \`\`\`bash

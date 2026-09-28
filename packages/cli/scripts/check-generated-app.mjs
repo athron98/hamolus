@@ -529,6 +529,68 @@ try {
     }
   }
 
+  // A seed that fills a collection nobody reads is decoration: the site would be exactly
+  // as empty as it was before the seed ran, and the only symptom is a project that looks
+  // seeded and renders blank. The two site templates declare what they read in a local
+  // `Article` interface, so that interface is the contract, and the seed's collection is
+  // checked against it rather than against a hand-copied list that would drift quietly.
+  {
+    const seedSource = readFileSync(join(REPO, 'templates', 'seeds', 'basic', 'index.mjs'), 'utf8')
+
+    // The collection has to be called `articles` exactly. The templates hard-code the name
+    // in `listRecords<Article>('articles', ...)`, so a `{{SEED_ID}}_articles` would leave
+    // the site reading a collection that does not exist.
+    ok(
+      'the basic seed creates a collection named exactly "articles"',
+      /name:\s*'articles',/.test(seedSource) && !/name:\s*'\{\{SEED_ID\}\}_articles'/.test(seedSource),
+      'the site templates request "articles" by that exact name',
+    )
+
+    for (const framework of ['astro', 'nextjs']) {
+      const articlesFile = join(REPO, 'templates', 'sites', framework, 'basic', 'src', 'lib', 'articles.ts')
+      const source = readFileSync(articlesFile, 'utf8')
+      const body = source.slice(source.indexOf('export interface Article'))
+      const expected = [...body.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1]).filter((n) => n !== 'id')
+      ok(`the ${framework} Article interface declares fields`, expected.length >= 8, expected.join(', '))
+
+      // Every field the site reads must exist on the seeded collection, or the value comes
+      // back `undefined` and the template renders an empty tag or a broken date.
+      const seeded = [...seedSource.matchAll(/\{\s*name:\s*'(\w+)'[^}]*type:/g)].map((m) => m[1])
+      const missing = expected.filter((name) => !seeded.includes(name))
+      ok(
+        `the basic seed covers every field the ${framework} site reads`,
+        missing.length === 0,
+        missing.length === 0 ? expected.join(', ') : `missing from the seed: ${missing.join(', ')}`,
+      )
+
+      // `title` and `cover` are read as plain strings, and the site requests records
+      // without a `locale`. A localized field comes back as its whole `{ id, en }` object
+      // in that case, which renders as `[object Object]`, and a `media` field comes back as
+      // a snapshot object rather than a URL for `<img src>`. Both are easy to "improve" the
+      // field definition into a broken site, so the reason is asserted, not the style.
+      ok(
+        `the seeded title is not localized, so the ${framework} site can read it as a string`,
+        !/name:\s*'title'[^}]*localized:\s*true/.test(seedSource),
+        'a localized field returns an object when the request carries no locale',
+      )
+      ok(
+        `the seeded cover is a url, so the ${framework} site can put it in src=`,
+        /name:\s*'cover'[^}]*type:\s*'url'/.test(seedSource) &&
+          !/name:\s*'cover'[^}]*type:\s*'media'/.test(seedSource),
+        'a media field reads back as { id, url, alt, ... }, not a string',
+      )
+    }
+
+    // Both templates have to read the same collection, or a project built with the other
+    // framework silently gets the empty version.
+    const astro = readFileSync(join(REPO, 'templates', 'sites', 'astro', 'basic', 'src', 'lib', 'articles.ts'), 'utf8')
+    const nextjs = readFileSync(join(REPO, 'templates', 'sites', 'nextjs', 'basic', 'src', 'lib', 'articles.ts'), 'utf8')
+    ok(
+      'both site templates request the same collection',
+      /listRecords<Article>\(\s*'articles'/.test(astro) && /listRecords<Article>\(\s*'articles'/.test(nextjs),
+    )
+  }
+
   // A panel is not a process, so it must not appear in the root `dev`. A `--filter` for a
   // path with no `dev` script fails the whole parallel run, which would make asking for
   // a panel the fastest way to break `pnpm dev`.

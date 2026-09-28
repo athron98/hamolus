@@ -10,6 +10,36 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 Nothing yet.
 
+## [0.2.6] — 2026-09-28
+
+### Added
+
+- **The `basic` seed now fills the `articles` collection the site templates read.** It
+  seeded a `basic_notes` collection that no template asked for, so a seeded project had one
+  more collection in the console and exactly the same empty home page — the symptom being a
+  project that looks seeded and renders blank. The collection is deliberately *not* prefixed
+  with the seed id, unlike every other one, because the templates request `articles` by that
+  exact name. Four articles come with it, one of them a draft, so the site's
+  `status = published` filter is exercised rather than assumed.
+
+### Fixed
+
+- **The seeded `title` is a plain string, and `cover` is a `url` field.** Both are the
+  field types the templates can actually read. The site requests records without a `locale`
+  parameter, and a localized field comes back as its whole `{ id, en }` object in that case,
+  which `title: string` would render as `[object Object]`; `cover` goes straight into
+  `<img src={cover}>`, where a `media` field would arrive as an `{ id, url, alt }` snapshot
+  rather than a string. `check:generated-app` now derives the field list from the templates'
+  own `Article` interface instead of a hand-copied one, and asserts both of these, so the
+  definition cannot be "improved" into a site that builds and renders nothing.
+
+### Note
+
+`v0.2.5` is tagged but was never published. The seed question and the three flag fixes
+landed there, and this release was cut before the OTP publish went through, because the
+seed turned out not to feed the generated site at all — which is the whole reason the
+question exists. The registry skips 0.2.5.
+
 ## [0.2.5] — 2026-09-28
 
 ### Added
@@ -332,7 +362,8 @@ pnpm up "@hamolus/*@^0.2.0"
 After that, review your collections' `mcp` mode — any collection an agent was
 writing to needs `mcp: 'write'`.
 
-[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/hamolus-labs/hamolus/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/hamolus-labs/hamolus/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/hamolus-labs/hamolus/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/hamolus-labs/hamolus/compare/v0.2.2...v0.2.3

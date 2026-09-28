@@ -81,6 +81,11 @@ ADMIN_KEY=$(grep '^ADMIN_KEY=' core/.dev.vars | cut -d= -f2-) pnpm -F ./seeds/ba
 Re-running it is safe: the script drops the collections and media it owns before recreating
 them, so it never duplicates records.
 
+What the `basic` seed fills is the `articles` collection, because that is what the generated
+site reads — the templates request `articles` by that exact name, so a prefixed collection
+would leave the home page just as empty. Four articles come with it, one deliberately a
+draft, so the site's `status = published` filter is exercised rather than assumed.
+
 A seed has no `--with-` spelling, unlike the parts above. It writes to a core over HTTP, so
 "a seed with no core" is a script that can never run — `hamolus create acme --console --seed
 basic` is refused rather than scaffolded into a directory that fails on its first fetch.

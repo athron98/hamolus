@@ -29,9 +29,11 @@ const API = `${BASE}/api`
 const KEY = process.env.ADMIN_KEY
 const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true'
 
-// Everything this seed owns. Rename the collection if you want a different dataset, and
-// add your own collection definitions to `collections` below.
-const COLLECTION = '{{SEED_ID}}_notes'
+// Everything this seed owns. The site collection below is deliberately *not* namespaced
+// with `{{SEED_ID}}`, unlike the notes collection next to it: the generated site asks the
+// core for `articles` by that exact name (`src/lib/articles.ts`), so a prefixed collection
+// would leave the site just as empty as it was before you ran this. Everything else is
+// prefixed to stay out of the way of whatever you already had in the core.
 const MEDIA_GROUP = '{{SEED_ID}}'
 
 /**
@@ -42,12 +44,122 @@ const MEDIA_GROUP = '{{SEED_ID}}'
 const collections = [
   {
     records: [
+      {
+        title: 'Your first article',
+        slug: 'your-first-article',
+        excerpt: 'This page is example content, so the site was not empty when you opened it.',
+        body: [
+          'A seed is just a Node script that talks to the core over HTTP, so there is nothing',
+          'magic about it: create a collection, write a few records, and delete both later.',
+        ].join('\n\n'),
+        cover: '',
+        tags: ['intro'],
+        author_name: '{{PACKAGE_NAME}}',
+        published_at: '2026-01-14',
+        status: 'published',
+      },
+      {
+        title: 'Why an empty site looks broken',
+        slug: 'why-an-empty-site-looks-broken',
+        excerpt: 'An empty page and a failing page look identical to the person reading it.',
+        body: [
+          'The first thing anyone does with a new site is open it. If there is nothing on',
+          'screen, they cannot tell "no content yet" apart from "this is broken", and they',
+          'stop looking.',
+          '',
+          'So the wizard asks whether to seed example content, and answers yes when there is',
+          'a site to fill. Delete these records when your own content arrives.',
+        ].join('\n\n'),
+        cover: '',
+        tags: ['guide', 'intro'],
+        author_name: '{{PACKAGE_NAME}}',
+        published_at: '2026-02-03',
+        status: 'published',
+      },
+      {
+        title: 'How to replace this content',
+        slug: 'how-to-replace-this-content',
+        excerpt: 'The seed owns exactly the collections and media group it declares.',
+        body: [
+          'Every collection this seed created is named in one place, and so is the media',
+          'group it cleans up, so re-running it drops and rebuilds rather than duplicating.',
+          '',
+          'Edit the `collections` array in this file to change the shape, then run it again.',
+          'Your own content in a collection this seed does not own is never touched.',
+        ].join('\n\n'),
+        cover: '',
+        tags: ['guide'],
+        author_name: '{{PACKAGE_NAME}}',
+        published_at: '2026-03-21',
+        status: 'published',
+      },
+      {
+        // Deliberately `draft`: the site filters on `status = published`, so this row proves
+        // the filter works instead of adding a fourth card to the front page.
+        title: 'An unpublished draft',
+        slug: 'an-unpublished-draft',
+        excerpt: 'Not shown on the site, and not meant to be.',
+        body: 'This one is a draft, so the site leaves it out.',
+        cover: '',
+        tags: ['notes'],
+        author_name: '{{PACKAGE_NAME}}',
+        published_at: '2026-04-02',
+        status: 'draft',
+      },
+    ],
+    definition: {
+      // Not `{{SEED_ID}}_articles` — see the note above MEDIA_GROUP. The generated site
+      // hard-codes this name, so this is the one collection a seed cannot namespace.
+      name: 'articles',
+      label: 'Articles',
+      description:
+        'Example content read by the generated site. Delete this collection to undo the seed.',
+      group: 'seeds',
+      icon: 'file',
+      timestamps: true,
+      fields: [
+        // Not `localized`. The site asks for records without a `locale` parameter, and the
+        // core returns a localized field's whole `{ id, en }` object in that case — which
+        // the site would then render as `[object Object]`. A plain string is what the
+        // template's `Article` interface actually describes. Add `localized: true` and pass
+        // a locale from the site, in that order, not the other way round.
+        { name: 'title', label: 'Title', type: 'string', required: true, consoleView: 'header' },
+        { name: 'slug', label: 'Slug', type: 'slug', required: true, unique: true },
+        { name: 'excerpt', label: 'Excerpt', type: 'text' },
+        { name: 'body', label: 'Body', type: 'richtext', format: 'markdown' },
+        // `url`, not `media`: the template renders `cover` as `<img src={cover}>`, and a
+        // media field reads back as an `{ id, url, alt, ... }` snapshot object instead of a
+        // string. Seed real cover images into MEDIA_GROUP and switch this to `media` when
+        // you want the console's asset picker.
+        { name: 'cover', label: 'Cover', type: 'url' },
+        {
+          name: 'tags',
+          label: 'Tags',
+          type: 'enum',
+          enumValues: ['intro', 'guide', 'notes'],
+          control: 'multichecklist',
+        },
+        { name: 'author_name', label: 'Author', type: 'string' },
+        { name: 'published_at', label: 'Published at', type: 'date' },
+        {
+          name: 'status',
+          label: 'Status',
+          type: 'enum',
+          enumValues: ['draft', 'published'],
+          default: 'draft',
+          consoleView: 'side',
+        },
+      ],
+    },
+  },
+  {
+    records: [
       { title: 'First note', slug: 'first-note', body: 'Replace this with your own content.', pinned: true },
       { title: 'Second note', slug: 'second-note', body: 'A seed is just a script.', pinned: false },
       { title: 'Third note', slug: 'third-note', body: 'Re-run it as often as you like.', pinned: false },
     ],
     definition: {
-      name: COLLECTION,
+      name: '{{SEED_ID}}_notes',
       label: '{{SEED_NAME}} Notes',
       description: 'Seeded by {{PACKAGE_NAME}}. Delete this collection to undo the seed.',
       group: 'seeds',
@@ -197,7 +309,8 @@ async function main() {
   const created = await createRecords()
   console.log(`created ${created} record(s)`)
 
-  console.log(`\ndone — open the console and browse "${COLLECTION}".`)
+  console.log(`\ndone — open the console and browse "articles".`)
+  console.log('The generated site reads this collection, so it has something to show now.')
 }
 
 main().catch((error) => {
