@@ -19,7 +19,7 @@ like any other change to this repository.
 | [`hamolus-panels`](./hamolus-panels/SKILL.md) | Panel manifests: view kinds, field ACLs, role operations, filters, metrics, reference validation, `bootstrap` as the source of truth |
 | [`hamolus-config`](./hamolus-config/SKILL.md) | `core.config.ts` vs KV settings vs config entries vs Wrangler; the KV-wins localization precedence |
 | [`hamolus-seed`](./hamolus-seed/SKILL.md) | Self-cleaning seed scripts, `DRY_RUN`, `ADMIN_KEY`, skipping code-defined collections |
-| [`hamolus-verify`](./hamolus-verify/SKILL.md) | Which gate to run for which change, and how to read an environmental failure |
+| [`hamolus-verify`](./hamolus-verify/SKILL.md) | Which gate to run for which change, how to read an environmental failure, and the deploy-repository drift gate (`export-deploy-repo.mjs --check`) |
 
 Each one is narrow on purpose. A skill that covered everything would be loaded for
 every task and would be ignored for most of them.

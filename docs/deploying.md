@@ -3,6 +3,37 @@
 Hamolus is deployed as Cloudflare Workers plus static assets. Deploy the **core
 first** — the console, panel apps and MCP server all talk to it.
 
+There are two routes to a deployment. For the core, console and MCP there is a
+**one-click path** that requires nothing but a GitHub account; the rest of this
+page is the underlying, fully manual route that one-click automates.
+
+## 0. Deploy in one click
+
+Each deployable package is published, generated, to a public repository under
+`hamolus-labs/{core,console,mcp}`. The `[![Deploy to
+Cloudflare](https://deploy.workers.cloudflare.com/button)]` button in each of their
+READMEs forks the repository into your GitHub account, names the Worker, and
+Cloudflare provisions the KV namespace, D1 database and R2 bucket and wires
+Workers Builds — later pushes to your fork deploy themselves.
+
+The repositories are never edited by hand: `scripts/export-deploy-repo.mjs`
+generates them from `packages/*`, so a fork is always the current source. The
+export strips the placeholder resource ids (so Wrangler auto-provisions), rewrites
+`workspace:*` to real ranges (so `pnpm install` inside the fork succeeds), pins the
+`allowBuilds` set for pnpm ≥ 10 (without `workerd`, wrangler cannot start), ships a
+standalone `tsconfig.base.json`, and drops `prepack`. Drift is a failing gate:
+`--check` exports into a scratch directory and diffs against your local clones of
+the repositories.
+
+```bash
+node scripts/export-deploy-repo.mjs                # write to --dest (default: ../hamolus-deploy-repos)
+node scripts/export-deploy-repo.mjs --check --dest <clone-dir>   # fail if the clones have drifted
+```
+
+Anything in this page from "1. Resources" onward is the manual route the button
+runs for you, with the caveat that a button deploy **cannot set secrets** — set
+them after the first deploy (section 2).
+
 ## Order of deployment
 
 1. **core** — the API Worker (D1 + KV + R2 bindings)
@@ -133,7 +164,8 @@ non-loopback `BASE` on purpose — it registers and deletes a land, a colony and
 
 - `PUBLIC_GETS` is `vars`, not a secret. `true` lets an independent core serve
   unauthenticated `GET`s; every multi-tenant mode uses `false`.
-- The D1 and KV placeholders are intentional: a fresh configuration warns instead of
-  deploying against a resource that does not exist.
+- The D1 and KV placeholders are intentional in `packages/*`: a fresh configuration
+  warns instead of deploying against a resource that does not exist. They are
+  dropped only by the export (section 0), never by hand in the monorepo.
 - Nothing in the repository contains a real Cloudflare resource id, secret or
   credential.

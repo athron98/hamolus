@@ -1,6 +1,6 @@
 ---
 name: hamolus-verify
-description: Use ONLY when deciding which Hamolus checks/gates to run after a change, or when a gate failed. Separates offline gates from live gates needing a running core, lists the root 'pnpm check:*' names, and states which failures are environmental. Front-load keywords: pnpm check, gate, typecheck, build, check:code-definitions, check:panel-acl, verify.
+description: Use ONLY when deciding which Hamolus checks/gates to run after a change, or when a gate failed. Separates offline gates from live gates needing a running core, lists the root 'pnpm check:*' names and the deploy-repository drift gate, and states which failures are environmental. Front-load keywords: pnpm check, gate, typecheck, build, check:code-definitions, check:panel-acl, deploy repos, export-deploy-repo, verify.
 ---
 
 # Hamolus — Verify
@@ -33,6 +33,28 @@ pnpm -F @hamolus/cli check:plugin-config   # host↔plugin contract (cli, no roo
 
 **Build order matters:** `@hamolus/types` must be built before other packages typecheck (they resolve it through `dist`). A stale types build produces type errors that are not real — rebuild first, then believe the error.
 
+## The deploy-repository gate (offline, needs a local clone)
+
+The "Deploy to Cloudflare" buttons in the READMEs are backed by generated copies of
+`packages/{core,console,mcp}` in `hamolus-labs/{core,console,mcp}`. Those copies are
+**never edited by hand** — a stale copy would deploy old code behind a button that
+looks current (that is exactly how `athron98/hamolus-core` rotted).
+
+When `packages/core`, `packages/console` or `packages/mcp` (or `tsconfig.base.json`)
+change, re-export to a local clone and verify no drift:
+
+```bash
+node scripts/export-deploy-repo.mjs --dest <clone-dir>        # regenerate the copies
+node scripts/export-deploy-repo.mjs --check --dest <clone-dir>  # fail if the clones drifted
+```
+
+`--check` exports into a scratch directory and diffs against `--dest`; exit non-zero
+names the file that drifted. It is offline and self-cleaning (`node_modules/.cache`).
+If the change must reach the live repositories, the diff files are then committed
+and pushed in `hamolus-labs/*` — never edited in place there. Placeholder resource
+ids are intentionally stripped by the export (auto-provisioning), so a `--check`
+against the monorepo's own `wrangler.jsonc` is the wrong comparison.
+
 ## Live gates (need a core on `127.0.0.1:8787` or a warm install)
 
 ```bash
@@ -58,6 +80,7 @@ These are **not broken** when they fail on a laptop without a running core or a 
 | A template | `check:markers`, `check:generated-app`, `typecheck`, `build` |
 | Anything published | `check:copyright` |
 | A new package/plugin directory | `check:workspace-glob` |
+| `packages/core` / `console` / `mcp` or `tsconfig.base.json` | deploy-repo gate (`export-deploy-repo.mjs --check`) + rebuild `@hamolus/types` first |
 
 ## Reading a failure
 

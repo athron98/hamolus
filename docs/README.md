@@ -18,7 +18,7 @@ workflow.
 | [Console guide](../packages/console/docs/console.md) | the admin app: collections, records, media, panels, theming |
 | [Panels](../packages/panel/docs/panels.md) | manifests, roles, generated apps, private assets |
 | [MCP server](../packages/mcp/docs/mcp.md) | env, tools, running, wiring into an agent |
-| [Deploying](./deploying.md) | resources, secrets, configurations, console/panel deploys |
+| [Deploying](./deploying.md) | one-click deploy buttons, resources, secrets, configurations, console/panel deploys |
 
 ### Definitions
 

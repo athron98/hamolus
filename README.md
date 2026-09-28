@@ -186,6 +186,38 @@ The core's `CORE_MODE` decides how land resolution and rewriting behave:
 
 Pick one at creation time with `--mode`, or add a configuration per mode later.
 
+## Deploy
+
+Each runtime part has a public, generated repository you can deploy to Cloudflare
+without touching the shell. The button forks the repo, provisions the D1/KV/R2
+resources it declares, and wires Workers Builds for you:
+
+| Part | Pick a Worker to deploy |
+| ---- | ------------------------ |
+| **core** — the API Worker | [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hamolus-labs/core) |
+| **console** — the SolidJS admin app (static assets) | [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hamolus-labs/console) |
+| **mcp** — the MCP server for AI agents | [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hamolus-labs/mcp) |
+
+These repositories are generated from `packages/*` by
+`scripts/export-deploy-repo.mjs`, so a fork is always the current source — never
+a stale snapshot. A panel is a page *inside* the console, so it deploys with it.
+
+A button deploy does not set secrets — nothing secret goes through GitHub. After
+the first deploy, put them on the Worker from the repository it forked into
+(`core/`, `mcp/` respectively):
+
+```bash
+wrangler secret put JWT_SECRET
+wrangler secret put ADMIN_KEY
+# mcp additionally needs to know its core:
+wrangler secret put CORE_ADMIN_KEY
+wrangler secret put CORE_API_URL    # e.g. https://core.<your-subdomain>.workers.dev
+```
+
+The console is static assets and needs none of this. Nothing else is required —
+D1, KV and R2 are provisioned for you and documented in each repository's
+README.
+
 ## Packages
 
 | Package | What it is |
