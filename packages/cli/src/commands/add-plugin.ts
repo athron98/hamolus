@@ -389,7 +389,7 @@ export async function runAddPlugin(args: ParsedArgs): Promise<void> {
       sourcePackage: packageName,
       hints: [
         'pnpm install',
-        `pnpm -F ./console dev    # the plugin appears under Plugins in the sidebar`,
+        `pnpm dev    # the plugin appears under Plugins in the sidebar`,
         `the plugin is listed in console/${CONSOLE_CONFIG} — that file is the whole registration`,
       ],
     },

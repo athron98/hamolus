@@ -11,7 +11,7 @@ core/       the API Worker (thin seam over @hamolus/core)
 console/    SolidJS admin app
 panels/     generated data-driven app surfaces
 mcp/        Model Context Protocol server for AI agents
-sites/      public sites (Astro, Next.js) reading the core over REST
+site/       the public site (Astro, Next.js) reading the core over REST
 seeds/      data generators
 configs/    wrangler presets (staging, production, per land)
 ```
@@ -30,7 +30,7 @@ hamolus init                  # the same ten questions
 hamolus create acme           # or skip them entirely
 cd acme
 pnpm install
-pnpm dev                      # run the core locally
+pnpm dev                      # every part, in parallel
 ```
 
 `hamolus init` and `npm create hamolus@latest` are the same command; every question has a
@@ -51,6 +51,12 @@ hamolus add seed basic       # demo data
 hamolus add configuration basic
 ```
 
+Each flag adds that part and nothing else, so a project is one line:
+
+```bash
+npm create hamolus@latest acme --console --mcp --site nextjs
+```
+
 `hamolus list` shows what a project contains and where each part came from.
 
 The wizard writes a working `JWT_SECRET` and `ADMIN_KEY` into `core/.dev.vars`, so
@@ -64,6 +70,19 @@ site to `0.0.0.0`; a host name like `mac.lan` binds them there instead; `n` keep
 on `127.0.0.1`. The answer is written into each part's `dev` script rather than left as a
 flag to remember, so a project is either reachable as a whole or not at all. It is also
 `hamolus create acme --host 0.0.0.0` afterwards, and `hamolus link`-free either way.
+
+### Dev ports
+
+The core listens on 8787 and the MCP server on 8788, so a root `pnpm dev` can start both
+at once. Both read their port from the environment when you need a different one:
+
+```bash
+HAMOLUS_CORE_PORT=8797 HAMOLUS_MCP_PORT=8798 pnpm dev
+```
+
+A second checkout of the same project on one machine is a variable rather than a source
+edit. This is a `wrangler dev` setting only — a deployed Worker is addressed by its URL
+and has no port, so nothing here affects a deploy.
 
 ### Core templates
 

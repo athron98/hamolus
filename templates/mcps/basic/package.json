@@ -6,17 +6,18 @@
   "license": "MIT",
   "description": "MCP server for {{PROJECT_LABEL}}: exposes the core API as Model Context Protocol tools over Streamable HTTP.",
   "scripts": {
-    "dev": "wrangler dev --ip {{DEV_HOST}}",
+    "dev": "wrangler dev --ip {{DEV_HOST}} --port ${HAMOLUS_MCP_PORT:-{{DEV_PORT}}} --inspector-port 0",
     "build": "rm -rf dist && wrangler deploy --dry-run --outdir=dist",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hamolus/mcp": "^0.2.2"
+    "@hamolus/mcp": "^0.2.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260920.0",
     "typescript": "~5.9.0",
-    "wrangler": "^4.135.0"
+    "wrangler": "^4.135.0",
+    "@hamolus/mcp": "^0.2.3"
   }
 }

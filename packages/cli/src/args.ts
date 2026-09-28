@@ -77,6 +77,15 @@ export interface ParsedArgs {
     mcp?: boolean
     /** `init` only: add a site from this template (`astro`, `nextjs`, or a path). */
     site?: string
+    /**
+     * `init` only: add a panel of this name, skipping the question.
+     *
+     * A value rather than a boolean, unlike `--console` and `--mcp`: a panel is a page
+     * inside the console and `hamolus add panel` needs a name to build one, so there is
+     * no name for a bare `--panel` to default to that would not be a lie about what was
+     * asked for.
+     */
+    panel?: string
   }
 }
 
@@ -97,6 +106,7 @@ const OPTIONS = {
   console: { type: 'boolean' },
   mcp: { type: 'boolean' },
   site: { type: 'string' },
+  panel: { type: 'string' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   clear: { type: 'boolean' },
@@ -156,6 +166,7 @@ export function parse(argv: string[]): ParsedArgs {
       console: parsed.values.console,
       mcp: parsed.values.mcp,
       site: parsed.values.site,
+      panel: parsed.values.panel,
     },
   }
 }

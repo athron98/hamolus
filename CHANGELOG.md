@@ -10,6 +10,48 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 Nothing yet.
 
+## [0.2.3] — 2026-09-28
+
+### Fixed
+
+- **`hamolus create <name> --console --mcp --site` no longer throws the flags away.**
+  The three optional parts are the wizard's questions, and `runCreate` never implemented
+  them — so the command accepted them, wrote a core, suggested `hamolus add console` as
+  the next step, and exited 0. The flags are documented, so a script passing them got a
+  project missing three parts and a success code. A named `create` that describes more
+  than a core now goes through the same wizard `init` uses.
+- **The first optional part is no longer aimed at the project root.** `--output` names
+  the root of the project `create` writes, but the wizard passed it to the `add`
+  commands too, where it means "put this part at this path". The console was aimed at
+  the root, on top of the core, and stopped by a guard with a technically true and
+  completely misleading message: `already exists and is not recorded in hamolus.json`.
+- **A second `hamolus add site` names the site that owns the directory.** It used to
+  report the directory as unrecorded, which is false — it is recorded, under the other
+  id — and sent the reader looking for a missing entry instead of at the site they had.
+- **Two parts of one project no longer fight over the same port.** The core and the MCP
+  server both defaulted to 8787, so `pnpm dev` could only ever start one of them. The MCP
+  server takes 8788, and both wranglers pass `--inspector-port 0` so two instances can
+  start at the same moment without racing for a fixed inspector port.
+
+### Changed
+
+- **`pnpm dev` starts every part.** The root script is derived from `hamolus.json` and
+  refreshed whenever a part is added, so a project no longer needs a terminal per part
+  to get going:
+
+  ```sh
+  pnpm --parallel --filter ./core --filter ./console --filter ./mcp --filter ./site dev
+  ```
+
+  Panels are deliberately absent: a panel is a console page with its own dev server and
+  no standalone process, and its own `pnpm -F <scope>/panel-<name> dev` stays the way to
+  run one.
+- **A site is always at `site/`.** It was `sites/<name>/`, which made the path depend on
+  the name, the directory a poor name for the one public site a project has, and
+  `pnpm dev` unable to refer to it. The site id is still derived from the project name
+  and still drives the package name and the `.env` variables; only the directory is
+  fixed. A project holds one site, and asking for a second is refused by name.
+
 ## [0.2.2] — 2026-09-28
 
 Two halves of one complaint: starting a project asked for ten answers that had to

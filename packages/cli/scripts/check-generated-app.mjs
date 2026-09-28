@@ -57,7 +57,7 @@
  * editing the CLI sources, or this exercises the previous build.
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -328,7 +328,150 @@ try {
     readFileSync(join(project, 'hamolus.json'), 'utf8'),
   )
 
-  // 7. Both site templates, generated into the same project and built from one install.
+  // 6b. One part per flag. `--console` on its own must produce a core and a console and
+  //     nothing else — the point of a flag is that it says what you want, and a `--console`
+  //     that also dragged in a site and an MCP server would be a flag nobody could use.
+  for (const [flag, expected, forbidden] of [
+    [['--console'], ['core', 'console'], ['mcp', 'site', 'panel']],
+    [['--mcp'], ['core', 'mcp'], ['console', 'site', 'panel']],
+    // `--panel` takes a name, so it is spelled with one. A bare `--panel` would have to
+    // invent a name, and a flag that silently generates a page nobody asked for is the
+    // same failure as one that adds three parts nobody asked for.
+    [['--panel', 'admin'], ['core', 'panel'], ['console', 'mcp', 'site']],
+  ]) {
+    const label = flag.join(' ')
+    const solo = join(root, `solo-${flag[0].replace('--', '')}`)
+    const created = hamolus(root, ['create', 'solo', '--link', REPO, '-o', solo, '-y', ...flag])
+    ok(
+      `create ${label} succeeds on its own`,
+      created.status === 0,
+      `${created.stdout}\n${created.stderr}`,
+    )
+    if (created.status !== 0) continue
+
+    const kinds = (JSON.parse(readFileSync(join(solo, 'hamolus.json'), 'utf8')).parts ?? []).map(
+      (part) => part.kind,
+    )
+    ok(
+      `create ${label} adds exactly ${expected.join(' + ')}`,
+      expected.every((kind) => kinds.includes(kind)) && kinds.length === expected.length,
+      kinds.join(', '),
+    )
+    ok(
+      `create ${label} adds none of ${forbidden.join(', ')}`,
+      forbidden.every((kind) => !kinds.includes(kind)),
+      kinds.join(', '),
+    )
+  }
+
+  // A panel is not a process, so it must not appear in the root `dev`. A `--filter` for a
+  // path with no `dev` script fails the whole parallel run, which would make asking for
+  // a panel the fastest way to break `pnpm dev`.
+  {
+    const panelOnly = join(root, 'panel-dev')
+    hamolus(root, ['create', 'panels', '--link', REPO, '-o', panelOnly, '-y', '--panel', 'admin'])
+    const dev = JSON.parse(readFileSync(join(panelOnly, 'package.json'), 'utf8')).scripts?.dev ?? ''
+    ok(
+      'a panel is left out of pnpm dev',
+      existsSync(join(panelOnly, 'panels', 'admin', 'package.json')) && !dev.includes('panel'),
+      dev,
+    )
+  }
+
+  // Dev ports come from the environment so a second checkout on one machine is a variable
+  // rather than a source edit. Deploys have no port, so this is a `wrangler dev` setting
+  // and nothing more — which is why it is safe to put in the template at all.
+  {
+    const portProject = join(root, 'ports')
+    hamolus(root, [
+      'create', 'ports', '--link', REPO, '-o', portProject, '-y', '--core', 'predefined', '--mcp',
+    ])
+    const core = JSON.parse(readFileSync(join(portProject, 'core', 'package.json'), 'utf8'))
+    const mcp = JSON.parse(readFileSync(join(portProject, 'mcp', 'package.json'), 'utf8'))
+    ok(
+      'the core dev script reads HAMOLUS_CORE_PORT',
+      core.scripts.dev.includes('${HAMOLUS_CORE_PORT:-8787}'),
+      core.scripts.dev,
+    )
+    ok(
+      'the MCP dev script reads HAMOLUS_MCP_PORT',
+      mcp.scripts.dev.includes('${HAMOLUS_MCP_PORT:-8788}'),
+      mcp.scripts.dev,
+    )
+    ok(
+      'the two dev servers still default to different ports',
+      !core.scripts.dev.includes('8788') && !mcp.scripts.dev.includes('8787'),
+      `${core.scripts.dev}\n${mcp.scripts.dev}`,
+    )
+  }
+
+  // 7. One `create` with every part asked for on the command line.
+  //
+  // This is the command a person actually types, and it is the one that had nothing
+  // testing it. Every other gate here builds a project and then adds a part with a
+  // *second* `hamolus` invocation, which is why two bugs survived a green suite:
+  //
+  //   - `create --console --mcp --site` was accepted, documented, and silently discarded,
+  //     because `runCreate` never implemented the wizard's flags. The project came out
+  //     with a core and a "hamolus add console" suggestion, and exit 0.
+  //   - once that was routed through the wizard, `--output` was forwarded to the `add`
+  //     commands too, where it means "put this part here" rather than "this is the
+  //     project root". The first optional part was aimed at the project root, on top of
+  //     the core, and stopped by a guard with a technically true and completely
+  //     misleading message.
+  //
+  // Both are invisible unless the parts are requested at create time, so that is what
+  // this runs: one command, every part, and an assertion per part about where it landed.
+  const oneShot = join(root, 'oneshot')
+  const oneShotCreated = hamolus(root, [
+    'create', 'oneshot', '--link', REPO, '-o', oneShot, '-y',
+    '--core', 'predefined', '--console', '--mcp', '--site', 'astro',
+  ])
+  ok(
+    'create with --console --mcp --site succeeds in one command',
+    oneShotCreated.status === 0,
+    `${oneShotCreated.stdout}\n${oneShotCreated.stderr}`,
+  )
+
+  if (oneShotCreated.status === 0) {
+    for (const part of ['core', 'console', 'mcp', 'site']) {
+      ok(
+        `create put the ${part} at ./${part}`,
+        existsSync(join(oneShot, part, 'package.json')),
+        readdirSync(oneShot).join(', '),
+      )
+    }
+
+    const recorded = JSON.parse(readFileSync(join(oneShot, 'hamolus.json'), 'utf8'))
+    ok(
+      'create recorded all four parts',
+      ['core', 'console', 'mcp', 'site'].every((kind) =>
+        (recorded.parts ?? []).some((part) => part.kind === kind && part.path === kind),
+      ),
+      JSON.stringify(recorded.parts),
+    )
+
+    // The whole point of the feature: one command starts the lot. Asserted here as a
+    // string rather than by running it, because the `pnpm dev` smoke needs ports and a
+    // second gate has the better view of those.
+    const dev = JSON.parse(readFileSync(join(oneShot, 'package.json'), 'utf8')).scripts?.dev ?? ''
+    ok(
+      'pnpm dev starts every part, in parallel',
+      dev.startsWith('pnpm --parallel') &&
+        ['./core', './console', './mcp', './site'].every((f) => dev.includes(`--filter ${f}`)),
+      dev,
+    )
+
+    // The next-step hint is the only thing a new user reads. "pnpm -F ./core dev" here
+    // would tell them to start a fifth terminal instead of the one command they have.
+    ok(
+      'the next-step hint says pnpm dev',
+      /pnpm dev\b/.test(oneShotCreated.stdout) && !/pnpm -F \.\/core dev/.test(oneShotCreated.stdout),
+      oneShotCreated.stdout.slice(-600),
+    )
+  }
+
+  // 7. Both site templates, one project each.
   //
   // A site is the only part that ships no `@hamolus/*` dependency: it reads the core
   // over plain REST with a hand-written client. That removes the link problems the
@@ -342,89 +485,111 @@ try {
   // failure mode worth being afraid of here, because it deploys: CI is green, the blog
   // is empty, and nothing in the output says why. So this gate runs both builds with no
   // core running and requires a non-zero exit carrying a message that names the fix.
-  const siteProject = join(root, 'sites')
-  const siteCreated = hamolus(root, [
-    'create', 'blogco', '--link', REPO, '-o', siteProject, '-y', '--core', 'predefined',
-  ])
-  ok('create succeeds for the site project', siteCreated.status === 0, `${siteCreated.stdout}\n${siteCreated.stderr}`)
+  //
+  // One project per template because a project holds one site. The path is the fixed
+  // `site/`, so a second `add site` has nowhere to go — and the second add is checked
+  // below to be refused *by name*, since a refusal that only says "already exists" is
+  // what a person hits after an afternoon of wondering which of their two sites the CLI
+  // meant.
+  const frameworks = [
+    { id: 'astro_blog', template: 'astro', project: join(root, 'site-astro') },
+    { id: 'next_blog', template: 'nextjs', project: join(root, 'site-next') },
+  ]
 
-  const siteAdded = hamolus(siteProject, ['add', 'site', 'astro_blog', '--template', 'astro'])
-  ok('add site (astro) succeeds', siteAdded.status === 0, `${siteAdded.stdout}\n${siteAdded.stderr}`)
+  for (const { id, template, project: siteProject } of frameworks) {
+    const siteCreated = hamolus(root, [
+      'create', 'blogco', '--link', REPO, '-o', siteProject, '-y', '--core', 'predefined',
+    ])
+    ok(`create succeeds for the ${template} site project`, siteCreated.status === 0, `${siteCreated.stdout}\n${siteCreated.stderr}`)
 
-  const nextAdded = hamolus(siteProject, ['add', 'site', 'next_blog', '--template', 'nextjs'])
-  ok('add site (nextjs) succeeds', nextAdded.status === 0, `${nextAdded.stdout}\n${nextAdded.stderr}`)
+    const siteAdded = hamolus(siteProject, ['add', 'site', id, '--template', template])
+    ok(`add site (${template}) succeeds`, siteAdded.status === 0, `${siteAdded.stdout}\n${siteAdded.stderr}`)
 
-  if (siteCreated.status === 0 && siteAdded.status === 0 && nextAdded.status === 0) {
+    if (siteCreated.status !== 0 || siteAdded.status !== 0) continue
+
+    // A second site has nowhere to live, and the error has to name the site that already
+    // owns the directory. A refusal that only says "already exists" is what a person hits
+    // after an afternoon of wondering which of their two sites the CLI just overwrote.
+    const second = hamolus(siteProject, ['add', 'site', 'another', '--template', template])
+    const refusal = `${second.stdout}\n${second.stderr}`
+    ok(
+      `a project refuses a second site (${template})`,
+      second.status !== 0,
+      'a second add site succeeded — it must not, the project holds one site',
+    )
+    ok(
+      `the refusal names the site that owns the directory (${template})`,
+      refusal.includes(`"${id}"`) && /--force/.test(refusal),
+      refusal,
+    )
+
     const siteManifest = JSON.parse(readFileSync(join(siteProject, 'hamolus.json'), 'utf8'))
     const siteKinds = (siteManifest.parts ?? []).filter((part) => part.kind === 'site')
-    ok('both sites are recorded in hamolus.json', siteKinds.length === 2, JSON.stringify(siteKinds))
+    ok(`the ${template} site is recorded in hamolus.json`, siteKinds.length === 1 && siteKinds[0].id === id, JSON.stringify(siteKinds))
+    ok(`the ${template} site is recorded at site/`, siteKinds[0]?.path === 'site', JSON.stringify(siteKinds[0]?.path))
 
     const workspace = readFileSync(join(siteProject, 'pnpm-workspace.yaml'), 'utf8')
     ok(
-      'the sites glob is inside the packages block',
-      /^\s*-\s*'?sites\/\*'?\s*$/m.test(workspace) && !/packages:[\s\S]*\n\S[\s\S]*sites\/\*/.test(workspace),
+      `the site glob is inside the packages block (${template})`,
+      /^\s*-\s*'?site'?\s*$/m.test(workspace) && !/packages:[\s\S]*\n\S[\s\S]*\nsite/.test(workspace),
       workspace,
     )
 
-    for (const id of ['astro_blog', 'next_blog']) {
-      const dir = join(siteProject, 'sites', id)
-      const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
-      ok(
-        `the ${id} site is named after the project scope`,
-        manifest.name === `@blogco/site-${id}`,
-        manifest.name,
-      )
-      // A site must not acquire a Hamolus runtime dependency: the whole point of the
-      // hand-written client is that a public bundle carries no admin SDK.
-      ok(
-        `the ${id} site depends on no @hamolus/* runtime`,
-        !Object.keys(manifest.dependencies ?? {}).some((name) => name.startsWith('@hamolus/')),
-        JSON.stringify(manifest.dependencies),
-      )
-      ok(
-        `the ${id} site's origin is not a template token`,
-        !/\{\{[A-Z0-9_]+\}\}/.test(readFileSync(join(dir, 'src', 'lib', 'hamolus.ts'), 'utf8')),
-      )
-    }
+    const dir = join(siteProject, 'site')
+    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+    ok(
+      `the ${id} site is named after the project scope`,
+      manifest.name === `@blogco/site-${id}`,
+      manifest.name,
+    )
+    // A site must not acquire a Hamolus runtime dependency: the whole point of the
+    // hand-written client is that a public bundle carries no admin SDK.
+    ok(
+      `the ${id} site depends on no @hamolus/* runtime`,
+      !Object.keys(manifest.dependencies ?? {}).some((name) => name.startsWith('@hamolus/')),
+      JSON.stringify(manifest.dependencies),
+    )
+    ok(
+      `the ${id} site's origin is not a template token`,
+      !/\{\{[A-Z0-9_]+\}\}/.test(readFileSync(join(dir, 'src', 'lib', 'hamolus.ts'), 'utf8')),
+    )
+
+    // Adding a part rewrites the root `dev` script, so a project that grew a site has to
+    // start it without being told to. This is the whole point of deriving that script.
+    const devScript = JSON.parse(readFileSync(join(siteProject, 'package.json'), 'utf8')).scripts?.dev ?? ''
+    ok(
+      `pnpm dev starts the ${template} site (${template})`,
+      devScript.includes('--filter ./site') && devScript.includes('--filter ./core'),
+      devScript,
+    )
 
     const siteInstalled = pnpm(siteProject, ['install'])
     ok(
-      'pnpm install succeeds (two sites)',
+      `pnpm install succeeds (${template} site)`,
       siteInstalled.status === 0,
       `${siteInstalled.stdout}\n${siteInstalled.stderr}`,
     )
 
-    const astroChecked = pnpm(siteProject, ['-F', './sites/astro_blog', 'check'])
+    const checked = pnpm(siteProject, ['-F', './site', template === 'astro' ? 'check' : 'typecheck'])
     ok(
-      'the astro site typechecks',
-      astroChecked.status === 0,
-      `${astroChecked.stdout}\n${astroChecked.stderr}`,
+      `the ${template} site typechecks`,
+      checked.status === 0,
+      `${checked.stdout}\n${checked.stderr}`,
     )
 
-    const nextTypechecked = pnpm(siteProject, ['-F', './sites/next_blog', 'typecheck'])
+    const built = pnpm(siteProject, ['-F', './site', 'build'])
+    const output = `${built.stdout}\n${built.stderr}`
     ok(
-      'the next site typechecks',
-      nextTypechecked.status === 0,
-      `${nextTypechecked.stdout}\n${nextTypechecked.stderr}`,
+      `${id} refuses to build with no core running`,
+      built.status !== 0,
+      'the build succeeded with an unreachable core — that deploys an empty site',
     )
-
-    for (const [id, message, envVar] of [
-      ['astro_blog', 'Could not read the article list', 'PUBLIC_HAMOLUS_ORIGIN'],
-      ['next_blog', 'Could not read the article list', 'HAMOLUS_API_ORIGIN'],
-    ]) {
-      const built = pnpm(siteProject, ['-F', `./sites/${id}`, 'build'])
-      const output = `${built.stdout}\n${built.stderr}`
-      ok(
-        `${id} refuses to build with no core running`,
-        built.status !== 0,
-        'the build succeeded with an unreachable core — that deploys an empty site',
-      )
-      ok(
-        `${id} names the cause and the fix`,
-        output.includes(message) && output.includes(envVar),
-        output.slice(-1200),
-      )
-    }
+    ok(
+      `${id} names the cause and the fix`,
+      output.includes('Could not read the article list') &&
+        output.includes(template === 'astro' ? 'PUBLIC_HAMOLUS_ORIGIN' : 'HAMOLUS_API_ORIGIN'),
+      output.slice(-1200),
+    )
   }
 } finally {
   rmSync(root, { recursive: true, force: true })

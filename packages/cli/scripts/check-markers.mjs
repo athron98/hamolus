@@ -97,8 +97,23 @@ const SUPPLIED_BY = {
   'add seed': ['SEED_ID', 'SEED_NAME', 'SEED_SLUG', 'PACKAGE_NAME'],
   'add panel': ['PANEL_ID', 'PANEL_NAME', 'PANEL_SLUG'],
   'add console': ['PROJECT_NAME', 'PROJECT_LABEL', 'PROJECT_SCOPE', 'PROJECT_SLUG', 'PACKAGE_NAME', 'DEV_HOST'],
-  'add mcp': ['PROJECT_NAME', 'PROJECT_LABEL', 'PROJECT_SCOPE', 'PROJECT_SLUG', 'PACKAGE_NAME', 'DEV_HOST'],
+  'add mcp': ['PROJECT_NAME', 'PROJECT_LABEL', 'PROJECT_SCOPE', 'PROJECT_SLUG', 'PACKAGE_NAME', 'DEV_HOST', 'DEV_PORT'],
   'add site': ['PROJECT_NAME', 'PROJECT_LABEL', 'PROJECT_SCOPE', 'PROJECT_SLUG', 'SITE_ID', 'SITE_NAME', 'SITE_SLUG', 'SITE_LABEL', 'PACKAGE_NAME', 'CORE_ORIGIN', 'DEV_HOST'],
+}
+
+/**
+ * The id a generated project recorded for its site.
+ *
+ * Read from `hamolus.json` rather than from a directory name, because a site lives at the
+ * fixed path `site/` and the directory therefore says nothing about the id. The id is the
+ * part of the answer that matters — it is what `hamolus add site` validates and what ends
+ * up in a package name — so it is what these assertions are about.
+ */
+function siteIdIn(projectRoot) {
+  const manifest = join(projectRoot, 'hamolus.json')
+  if (!existsSync(manifest)) return undefined
+  const recorded = JSON.parse(readFileSync(manifest, 'utf8'))
+  return recorded.parts?.find((part) => part.kind === 'site')?.id
 }
 
 /**
@@ -340,7 +355,7 @@ try {
     ok('the core is generated', existsSync(join(app, 'core', 'wrangler.jsonc')))
     ok('the console is generated', existsSync(join(app, 'console', 'package.json')))
     ok('the MCP server is generated', existsSync(join(app, 'mcp', 'package.json')))
-    ok('the site is generated', existsSync(join(app, 'sites', 'acme_site', 'package.json')))
+    ok('the site is generated', existsSync(join(app, 'site', 'package.json')))
 
     ok('a generated core gets working local secrets', existsSync(join(app, 'core', '.dev.vars')))
     const devVars = existsSync(join(app, 'core', '.dev.vars')) ? read('core', '.dev.vars') : ''
@@ -379,13 +394,13 @@ try {
     )
     ok(
       'the site binds that host',
-      read('sites', 'acme_site', 'package.json').includes('next dev --hostname 127.0.0.1'),
-      read('sites', 'acme_site', 'package.json'),
+      read('site', 'package.json').includes('next dev --hostname 127.0.0.1'),
+      read('site', 'package.json'),
     )
     ok(
       'a site is pointed at the core on the address it was created with',
-      read('sites', 'acme_site', 'src', 'lib', 'hamolus.ts').includes('http://127.0.0.1:8787'),
-      read('sites', 'acme_site', 'src', 'lib', 'hamolus.ts'),
+      read('site', 'src', 'lib', 'hamolus.ts').includes('http://127.0.0.1:8787'),
+      read('site', 'src', 'lib', 'hamolus.ts'),
     )
 
     const kinds = [...read('hamolus.json').matchAll(/"kind": "([a-z]+)"/g)].map((m) => m[1])
@@ -423,9 +438,9 @@ try {
       // is the phone. A site generated for a LAN project has to name a reachable origin.
       ok(
         'a site in a LAN project is not handed the bind address as its origin',
-        readFileSync(join(wide, 'sites', 'wide_site', 'src', 'lib', 'hamolus.ts'), 'utf8')
+        readFileSync(join(wide, 'site', 'src', 'lib', 'hamolus.ts'), 'utf8')
           .includes('http://localhost:8787'),
-        readFileSync(join(wide, 'sites', 'wide_site', 'src', 'lib', 'hamolus.ts'), 'utf8'),
+        readFileSync(join(wide, 'site', 'src', 'lib', 'hamolus.ts'), 'utf8'),
       )
     }
 
@@ -455,12 +470,8 @@ try {
         out.status === 0,
         `${out.stdout}\n${out.stderr}`,
       )
-      const site = join(dir, 'my-project', 'sites', 'my_project_site', 'package.json')
-      ok(
-        'the derived site id turns hyphens into underscores',
-        existsSync(site),
-        [...(existsSync(join(dir, 'my-project', 'sites')) ? readdirSync(join(dir, 'my-project', 'sites')) : [])].join(', '),
-      )
+      const id = siteIdIn(join(dir, 'my-project'))
+      ok('the derived site id turns hyphens into underscores', id === 'my_project_site', String(id))
     }
 
     {
@@ -473,18 +484,17 @@ try {
         out.status === 0,
         `${out.stdout}\n${out.stderr}`,
       )
-      const sites = join(dir, long, 'sites')
-      const generated = existsSync(sites) ? readdirSync(sites) : []
-      ok('the long-name site is generated', generated.length === 1, generated.join(', '))
+      const id = siteIdIn(join(dir, long))
+      ok('the long-name site is generated', typeof id === 'string', String(id))
       ok(
         'the derived site id fits what a part name allows',
-        generated.every((name) => /^[a-z][a-z0-9_]{0,63}$/.test(name)),
-        generated.join(', '),
+        typeof id === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(id),
+        String(id),
       )
       ok(
         'the derived site id keeps the suffix it was shortened to make room for',
-        generated.some((name) => name.endsWith('_site')),
-        generated.join(', '),
+        typeof id === 'string' && id.endsWith('_site'),
+        String(id),
       )
     }
 

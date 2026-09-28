@@ -13,13 +13,15 @@
     "deploy": "pnpm build && wrangler deploy"
   },
   "dependencies": {
-    "@hamolus/console": "^0.2.2",
-    "@hamolus/types": "^0.2.2"
+    "@hamolus/console": "^0.2.3",
+    "@hamolus/types": "^0.2.3"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "~5.9.0",
     "vite": "^8.3.0",
-    "wrangler": "^4.135.0"
+    "wrangler": "^4.135.0",
+    "@hamolus/console": "^0.2.3",
+    "@hamolus/types": "^0.2.3"
   }
 }

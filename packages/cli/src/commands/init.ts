@@ -29,7 +29,8 @@ import { PromptCancelled, Prompter } from '../prompt.js'
 import { dim, heading, info, next, step, success, warn } from '../util/log.js'
 import { runAddConsole } from './add-console.js'
 import { runAddMcp } from './add-mcp.js'
-import { DEFAULT_SITE_FRAMEWORK, runAddSite } from './add-site.js'
+import { runAddPanel } from './add-panel.js'
+import { DEFAULT_SITE_FRAMEWORK, runAddSite, SITE_DIRECTORY } from './add-site.js'
 import { BASIC_TEMPLATE, DEFAULT_DEV_HOST, DEFAULT_SCOPE_NAME, runCreate } from './create.js'
 
 /**
@@ -85,6 +86,8 @@ interface Plan {
   /** Undefined means no site; otherwise the framework or directory to generate from. */
   site?: string
   siteId: string
+  /** Undefined means no panel; otherwise the panel name to generate. */
+  panel?: string
 }
 
 /**
@@ -112,7 +115,8 @@ function summary(plan: Plan, target: string): void {
   const extras = [
     plan.console ? 'console' : null,
     plan.mcp ? 'mcp' : null,
-    plan.site ? `site ${plan.site} → sites/${plan.siteId}` : null,
+    plan.site ? `site ${plan.site} → ${SITE_DIRECTORY}` : null,
+    plan.panel ? `panel ${plan.panel}` : null,
   ].filter((entry): entry is string => entry !== null)
   rows.push([
     'also',
@@ -131,8 +135,19 @@ function summary(plan: Plan, target: string): void {
  *
  * The wizard calls the real commands rather than reimplementing them, so it has to hand
  * them something shaped like a parsed command line. Only the options that mean the same
- * thing for every target are carried across — `--output` and `--link` are the two — and
- * everything else comes from the answers.
+ * thing for every target are carried across — `--link` is the one — and everything else
+ * comes from the answers.
+ *
+ * `--output` is *not* carried across, because it does not mean the same thing twice. For
+ * `create` it names the root of the project being made; for an `add` it means "put this
+ * part at this path". Forwarding it to the adds pointed the first optional part at the
+ * project root itself, on top of the core, and `guardExisting` then refused it as an
+ * unrecorded directory:
+ *
+ *   ✖ /tmp/acme already exists and is not recorded in hamolus.json.
+ *
+ * which is a true sentence about a path nobody meant to write to. Each add here has a
+ * path the wizard already decided. The `create` call passes `output` back in explicitly.
  */
 function argsFor(
   parent: ParsedArgs,
@@ -146,7 +161,6 @@ function argsFor(
     flags: { help: false, yes: true, force: parent.flags.force, dryRun: false, clear: false },
     options: {
       ...(parent.options.link ? { link: parent.options.link } : {}),
-      ...(parent.options.output ? { output: parent.options.output } : {}),
       ...options,
     },
   }
@@ -355,6 +369,24 @@ async function ask(args: ParsedArgs, prompter: Prompter): Promise<Plan> {
   const site =
     answer.kind === 'no' ? undefined : answer.kind === 'yes' ? DEFAULT_SITE_FRAMEWORK : answer.value
 
+  // 11. A panel. A panel is a page inside the console rather than a process of its own,
+  // so it has no `dev` entry and no port — but `hamolus add panel <name>` needs a name, so
+  // unlike the yes/no questions above this one is a name from the start.
+  const panelAnswer = options.panel
+    ? ({ kind: 'custom', value: options.panel } as const)
+    : await prompter.maybe('Add a panel?', {
+        yes: 'admin',
+        no: 'none',
+        defaultKind: 'no',
+        hint: 'or type a name (a panel is a page inside the console)',
+      })
+  const panel =
+    panelAnswer.kind === 'no'
+      ? undefined
+      : panelAnswer.kind === 'yes'
+        ? 'admin'
+        : panelAnswer.value
+
   return {
     name,
     coreName,
@@ -374,6 +406,7 @@ async function ask(args: ParsedArgs, prompter: Prompter): Promise<Plan> {
     // project's own name is unambiguous here, and `hamolus add site <name>` makes
     // another one whenever the default does not fit.
     siteId: defaultSiteId(name),
+    panel,
   }
 }
 
@@ -441,6 +474,9 @@ export async function runInit(args: ParsedArgs): Promise<void> {
   try {
     await runCreate(
       argsFor(args, [plan.name], {
+        // The one caller that does want `--output`, because it names the root of the
+        // project about to be written rather than the place a part goes.
+        ...(args.options.output ? { output: args.options.output } : {}),
         coreName: plan.coreName,
         mode: plan.mode,
         core: plan.core,
@@ -457,6 +493,7 @@ export async function runInit(args: ParsedArgs): Promise<void> {
     if (plan.console) await runAddConsole(argsFor(args, ['console']))
     if (plan.mcp) await runAddMcp(argsFor(args, ['mcp']))
     if (plan.site) await runAddSite(argsFor(args, ['site', plan.siteId], { template: plan.site }))
+    if (plan.panel) await runAddPanel(argsFor(args, ['panel', plan.panel]))
   } finally {
     process.chdir(previous)
   }

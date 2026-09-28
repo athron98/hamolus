@@ -110,7 +110,7 @@ export async function runAddConsole(args: ParsedArgs): Promise<void> {
       origin: `console template (${template.origin})`,
       hints: [
         'pnpm install',
-        'pnpm -F ./console dev',
+        'pnpm dev                     # the console and the core, together',
         // The runtime lives in the generated manifest, so an unlinked project fails to
         // install with a bare 404 until it is published. Mirrors add panel.
         ...(context.link ? [] : ['# not published yet? re-link the checkout:', 'hamolus link <path-to-hamolus>']),

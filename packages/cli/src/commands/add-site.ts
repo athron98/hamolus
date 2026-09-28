@@ -16,8 +16,8 @@
  * that package is pinned to the panel endpoints and *requires* a token, and pulling an
  * admin SDK into a public bundle would add attack surface without adding capability.
  *
- * Generated into `sites/<name>/` and registered in `pnpm-workspace.yaml`, so
- * `pnpm -F ./sites/<name> dev` works the same way as every other part.
+ * Generated into `site/` and registered in `pnpm-workspace.yaml`, so
+ * `pnpm -F ./site dev` works the same way as every other part.
  */
 
 import { join, relative } from 'node:path'
@@ -36,6 +36,17 @@ import {
   requirePartName,
   warn,
 } from './shared.js'
+
+/**
+ * Where a site lives in a project: `site/`, always.
+ *
+ * Every other part either has a fixed directory (`core`, `console`, `mcp`) or is one of
+ * several of its kind (`panels/*`, `seeds/*`, `configs/*`). A site was `sites/<name>/`,
+ * which made a project that has one site carry a plural directory holding a single
+ * member, and made the common case a path nobody would guess. One site per project, at
+ * `site/` — the name still identifies the part, it just no longer names a directory.
+ */
+export const SITE_DIRECTORY = 'site'
 
 /** Site templates ship as `sites/<framework>/basic`, so the framework is the name. */
 export const DEFAULT_SITE_FRAMEWORK = 'astro'
@@ -112,7 +123,7 @@ async function resolveSiteTemplate(explicit: string | undefined) {
 export async function runAddSite(args: ParsedArgs): Promise<void> {
   const context = await openContext(args)
   const name = requirePartName(args, 'site')
-  const destination = destinationFor(context, join('sites', name))
+  const destination = destinationFor(context, SITE_DIRECTORY)
   const relativePath = relative(context.projectRoot, destination)
 
   guardExisting(context, 'site', name, destination)
@@ -141,8 +152,8 @@ export async function runAddSite(args: ParsedArgs): Promise<void> {
     tokens: siteTokens(context.project, name),
   })
 
-  if (await ensureWorkspaceGlob(context.projectRoot, 'sites/*')) {
-    info('added `sites/*` to pnpm-workspace.yaml')
+  if (await ensureWorkspaceGlob(context.projectRoot, SITE_DIRECTORY)) {
+    info(`added \`${SITE_DIRECTORY}\` to pnpm-workspace.yaml`)
   }
 
   // A site is the one part that talks to a core over plain unauthenticated GETs, so
@@ -175,9 +186,9 @@ export async function runAddSite(args: ParsedArgs): Promise<void> {
       origin: `site template (${template.origin})`,
       hints: [
         'pnpm install',
-        'pnpm -F ./core dev          # the site reads the core over REST — start it first',
-        `pnpm -F ./${relativePath} dev`,
-        `cp ${relativePath}/.env.example ${relativePath}/.env`,
+        // The root `dev` script now starts every part the project has, so adding a site
+        // is not followed by "and now start these two in separate terminals".
+        'pnpm dev                     # the site and the core it reads, together',
       ],
     },
   )

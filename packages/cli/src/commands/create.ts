@@ -268,7 +268,7 @@ const WORKSPACE_GLOBS = [
   'panels/*',
   'mcp',
   'seeds/*',
-  'sites/*',
+  'site',
 ].join('\n')
 
 /**
@@ -317,7 +317,9 @@ const ROOT_PACKAGE = (options: CreateOptions): string =>
       license: 'UNLICENSED',
       description: `${formatLabel(options.name)} — a Hamolus project`,
       scripts: {
-        dev: 'pnpm -F ./core dev',
+        // Matches what `devScript()` derives for a project holding only its core, so the
+        // first `hamolus add` changes the list rather than the spelling.
+        dev: 'pnpm --filter ./core dev',
         build: 'pnpm -r build',
         typecheck: 'pnpm -r typecheck',
         deploy: 'pnpm -F ./core deploy',
@@ -452,6 +454,18 @@ A [Hamolus](https://github.com/hamolus-labs/hamolus) project created with
       : `reachable from other devices on the network as http://${options.host}:8787`
   }
 
+## Dev ports
+
+\`pnpm dev\` reads these from the environment, so a second checkout on the same machine
+is a variable rather than a source edit:
+
+\`\`\`bash
+HAMOLUS_CORE_PORT=8797 HAMOLUS_MCP_PORT=8798 pnpm dev
+\`\`\`
+
+They are \`wrangler dev\` settings only. A deployed Worker is addressed by its URL and
+has no port, so nothing here affects a deploy.
+
 ## Layout
 
 \`\`\`
@@ -459,18 +473,22 @@ core/       the API Worker — dynamic CRUD on D1, KV settings, R2 libraries
 console/    (optional) admin console        \`hamolus add console\`
 panels/     (optional) generated panel apps \`hamolus add panel <name>\`
 mcp/        (optional) MCP server            \`hamolus add mcp\`
-sites/      (optional) Astro / Next.js sites \`hamolus add site <name>\`
-seeds/      (optional) seed scripts         \`hamolus add seed <name>\`
+site/       (optional) Astro / Next.js site  \`hamolus add site <name>\`
+seeds/      (optional) seed scripts          \`hamolus add seed <name>\`
 \`\`\`
 
 ## Commands
 
 \`\`\`bash
 pnpm install
-pnpm -F ./core dev      # API on http://localhost:8787
+pnpm dev        # every part, in parallel — the core, plus the console, MCP
+                # server and site if you added them
 pnpm typecheck
 pnpm build
 \`\`\`
+
+The core answers on http://localhost:8787 and the MCP server on
+http://localhost:8788, so a single \`pnpm dev\` is enough to drive all of them.
 
 ## Secrets
 
@@ -607,7 +625,9 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
   next([
     `cd ${options.name}`,
     'pnpm install',
-    'pnpm -F ./core dev',
+    // The root `dev` script starts the core and anything else in the project. Pointing
+    // at one part here is what taught people to open a terminal per part.
+    'pnpm dev',
     'hamolus add console',
     ...(link ? [] : ['# not published yet? re-link the checkout:', 'hamolus link <path-to-hamolus>']),
   ])

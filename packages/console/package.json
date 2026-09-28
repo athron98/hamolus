@@ -1,6 +1,6 @@
 {
   "name": "@hamolus/console",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "main": "./dist-lib/index.js",
   "types": "./dist-lib/lib.d.ts",
@@ -31,12 +31,12 @@
     "solidjs",
     "cloudflare"
   ],
-  "description": "The Hamolus console: a SolidJS + StyleX admin app for collections, records, media, files, panels, users and multi-land scope. Published as a Vite library \u2014 a generated console installs this package, calls `mount()` from plain TypeScript and links the stylesheet, so the host needs no JSX and no Solid toolchain.",
+  "description": "The Hamolus console: a SolidJS + StyleX admin app for collections, records, media, files, panels, users and multi-land scope. Published as a Vite library — a generated console installs this package, calls `mount()` from plain TypeScript and links the stylesheet, so the host needs no JSX and no Solid toolchain.",
   "hamolus": {
     "kind": "library",
     "entry": "dist-lib/index.js",
     "stylesheet": "dist-lib/index.css",
-    "mount": "mount(options?) \u2014 renders the console into a host element"
+    "mount": "mount(options?) — renders the console into a host element"
   },
   "files": [
     "dist-lib",

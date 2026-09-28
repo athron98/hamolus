@@ -16,7 +16,7 @@
  */
 
 export const CLI_NAME = 'hamolus'
-export const CLI_VERSION = '0.2.2'
+export const CLI_VERSION = '0.2.3'
 
 export const CORE_MODES = ['independent', 'centralized', 'proxy', 'bridge'] as const
 export type CoreMode = (typeof CORE_MODES)[number]
@@ -172,6 +172,7 @@ function initHelp(): string {
     '  8. Add an admin console?',
     '  9. Add an MCP server?',
     ' 10. Add a public site? — y = astro, n = none, or type a framework or a path',
+    ' 11. Add a panel? — y = admin, n = none, or type a name (a page in the console)',
     '',
     'Options:',
     '      --core-name <name> Skip question 2',
@@ -185,6 +186,7 @@ function initHelp(): string {
     '      --console          Answer question 8 with yes',
     '      --mcp              Answer question 9 with yes',
     '      --site <name>      Answer question 10 with this framework or path',
+    '      --panel <name>     Answer question 11 with this panel name',
     '  -o, --output <path>     Write the project somewhere else',
     '      --link <path>      Link @hamolus/* into a local checkout',
     '      --force            Overwrite an existing directory',

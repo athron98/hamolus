@@ -19,7 +19,7 @@
  * and the one `npm create hamolus@latest` runs.
  */
 
-import { parse } from './args.js'
+import { parse, type ParsedArgs } from './args.js'
 import { CLI_VERSION, commandHelp, usage } from './help.js'
 import { runAddConfiguration } from './commands/add-configuration.js'
 import { runAddConsole } from './commands/add-console.js'
@@ -49,6 +49,31 @@ type AddTarget = (typeof ADD_TARGETS)[number]
 
 function isAddTarget(value: string): value is AddTarget {
   return (ADD_TARGETS as readonly string[]).includes(value)
+}
+
+/**
+ * Options that describe a whole project rather than a core.
+ *
+ * `runCreate` owns a core and its secrets. Everything here is a question `init` asks and
+ * then acts on, by calling `runCreate` with the answer and following it with the `add`
+ * targets — so a `create` carrying any of them is a wizard run that happens to have its
+ * answers supplied already.
+ */
+const WIZARD_OPTIONS = [
+  'coreName',
+  'land',
+  'colony',
+  'jwt',
+  'key',
+  'host',
+  'console',
+  'mcp',
+  'site',
+  'panel',
+] as const
+
+function wizardFlags(args: ParsedArgs): boolean {
+  return WIZARD_OPTIONS.some((option) => args.options[option] !== undefined)
 }
 
 export async function run(argv: string[]): Promise<number> {
@@ -92,13 +117,33 @@ export async function run(argv: string[]): Promise<number> {
         return 0
       case 'create':
         // A bare `hamolus create` has no name and cannot invent one; the wizard can.
-        // So the wizard answers instead — including under `--yes`, which is a request
-        // for defaults and needs no terminal to supply them. Only a nameless, prompt-
-        // less, non-`-y` run is a genuine usage error: there is nothing to answer with
-        // and nothing to default from.
-        if (args.positionals.length === 0 && (canPrompt(false) || args.flags.yes)) {
-          await runInit(args)
-          return 0
+        // So the wizard answers instead — but only when it can actually answer: with a
+        // terminal, or under `--yes`, which is a request for defaults and needs no
+        // terminal to supply them. A nameless, prompt-less, non-`-y` run is a genuine
+        // usage error, because there is nothing to answer with and nothing to default
+        // from, and falling through to `create` is what reports it.
+        //
+        // A *named* `create` still goes to the wizard when the command line already
+        // describes more than a core. `--console`, `--mcp` and `--site` are the wizard's
+        // questions, and `runCreate` does not implement them: routing a named `create`
+        // straight to it made `hamolus create acme --console --site astro` write a core,
+        // print "hamolus add console" as the next step, and exit 0. The flags were
+        // accepted, documented and silently discarded — the worst of the three. Anything
+        // the wizard answers for goes through `init`, which calls `create` and then adds
+        // the parts, so there is one path rather than two that can disagree.
+        //
+        // `--dry-run` stays on `create`, because `init` has nothing to preview: the
+        // answers are the plan, and it runs them.
+        if (!args.flags.dryRun) {
+          const nameless = args.positionals.length === 0
+          if (nameless && (canPrompt(false) || args.flags.yes)) {
+            await runInit(args)
+            return 0
+          }
+          if (!nameless && wizardFlags(args)) {
+            await runInit(args)
+            return 0
+          }
         }
         await runCreate(args)
         return 0

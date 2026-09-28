@@ -37,6 +37,21 @@ import {
 } from './shared.js'
 
 /**
+ * The default port `wrangler dev` serves the MCP server on.
+ *
+ * `wrangler dev` defaults to 8787, which is also where the core runs, so two parts that
+ * both leave the port implicit collide the moment a root `pnpm dev` starts them in
+ * parallel — the second one exits on `EADDRINUSE` and the only symptom is an MCP server
+ * that is missing for reasons that appear to have nothing to do with the port. Naming
+ * the port is what makes the four dev servers coexist.
+ *
+ * Only a *default*. The generated `dev` script reads `MCP_DEV_PORT` from the
+ * environment and falls back to this, so a second checkout of the same project on one
+ * machine is `MCP_DEV_PORT=8798 pnpm dev` rather than a source edit.
+ */
+export const MCP_DEV_PORT = 8788
+
+/**
  * Tokens for `templates/mcps/basic`.
  *
  * Cloudflare Worker names only allow lowercase letters, digits and hyphens, so the
@@ -53,6 +68,7 @@ function mcpTokens(project: { name: string; scope: string; devHost?: string }): 
     PROJECT_SLUG: project.name.replace(/_/g, '-'),
     PACKAGE_NAME: `${project.scope}/mcp`,
     DEV_HOST: project.devHost ?? DEFAULT_DEV_HOST,
+    DEV_PORT: String(MCP_DEV_PORT),
   }
 }
 
@@ -106,7 +122,7 @@ export async function runAddMcp(args: ParsedArgs): Promise<void> {
       hints: [
         'pnpm install',
         'cp mcp/.env.example mcp/.dev.vars   # fill in CORE_API_URL + auth',
-        'pnpm -F ./mcp dev',
+        'pnpm dev                     # the MCP server and the core, on :8788 and :8787',
       ],
     },
   )
