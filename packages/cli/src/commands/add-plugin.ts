@@ -38,7 +38,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, relative } from 'node:path'
 import type { ParsedArgs } from '../args.js'
-import { fallbackRange, resolveWorkspaceDependencyVersion } from '../sources.js'
+import { UNPUBLISHED_VERSION_RANGE, resolveWorkspaceDependencyVersion } from '../sources.js'
 import { formatLabel } from '../templates.js'
 import {
   assertTemplateNotSource,
@@ -306,7 +306,7 @@ async function registerPlugin(
  *
  * Without a linked checkout there is no version to read, and `*` is the wrong answer
  * twice over: it silently accepts any future major of an unreleased package, and it
- * disagrees with the range the console template and {@link resolveDependencyRange}
+ * disagrees with the `^0.1.0` the console template and {@link resolveDependencyRange}
  * already write. The same fallback is used there, for the same reason — the generated
  * project stays installable against a package that is not on the registry yet.
  */
@@ -330,11 +330,8 @@ async function ensurePluginDependency(
     manifest.dependencies?.[packageName] ?? manifest.devDependencies?.[packageName]
   if (existing) return undefined
 
-  // Per package, not one constant: the plugins version independently of the core
-  // packages, so a shared fallback would hand this one a range it was never
-  // published at, and `pnpm install` would fail on a name the user never typed.
   const discovered = await resolveWorkspaceDependencyVersion(context.projectRoot, packageName)
-  const range = discovered ? `^${discovered.replace(/^[\^~]/, '')}` : fallbackRange(packageName)
+  const range = discovered ? `^${discovered.replace(/^[\^~]/, '')}` : UNPUBLISHED_VERSION_RANGE
 
   manifest.dependencies ??= {}
   manifest.dependencies[packageName] = range

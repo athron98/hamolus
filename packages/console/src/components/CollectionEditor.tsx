@@ -10,8 +10,8 @@
 
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import * as stylex from '@stylexjs/stylex'
-import type { CollectionDefinition, FieldDefinition, McpCollectionMode } from '@hamolus/types'
-import { buildGroupTree, collectionDefinitionSchema, MCP_COLLECTION_MODES } from '@hamolus/types'
+import type { CollectionDefinition, FieldDefinition } from '@hamolus/types'
+import { buildGroupTree, collectionDefinitionSchema } from '@hamolus/types'
 import { s, tokens } from '../theme.stylex'
 import { JsonEditor } from './JsonEditor'
 import { FieldEditor } from './FieldEditor'
@@ -39,19 +39,6 @@ const DEFAULT_FIELDS_JSON = JSON.stringify(
   null,
   2,
 )
-
-/**
- * What each MCP mode means, in the words the operator needs.
- *
- * The wording is deliberately about *effect*, not about the word: an operator
- * deciding this is not looking for a definition of "read", they are looking for
- * "can the agent delete my rows".
- */
-const MCP_MODE_HINTS: Record<McpCollectionMode, string> = {
-  read: 'The agent can read records through MCP, but cannot create, update or delete them. The default for a collection with no mode set.',
-  write: 'The agent can read and change records through MCP. Required before any MCP write tool will touch this collection.',
-  hide: 'The collection is invisible to MCP: not listed, not readable, and not editable through the MCP server.',
-}
 
 const styles = stylex.create({
   card: {
@@ -184,9 +171,6 @@ export function CollectionEditor(props: {
   const [group, setGroup] = createSignal(props.initial?.group ?? '')
   const [icon, setIcon] = createSignal(props.initial?.icon ?? '')
   const [timestamps, setTimestamps] = createSignal(props.initial?.timestamps ?? true)
-  // Absent means the core's default, which is `read` — not `write`. Showing `read`
-  // here is the point: the safe mode is the visible one.
-  const [mcpMode, setMcpMode] = createSignal<McpCollectionMode>(props.initial?.mcp ?? 'read')
   const [fieldsJson, setFieldsJson] = createSignal(
     JSON.stringify(props.initial?.fields ?? JSON.parse(DEFAULT_FIELDS_JSON), null, 2),
   )
@@ -277,7 +261,6 @@ export function CollectionEditor(props: {
       icon: icon() || undefined,
       timestamps: timestamps(),
       primaryKey: props.initial?.primaryKey ?? 'id',
-      mcp: mcpMode(),
       fields: values,
     })
     if (!result.success) {
@@ -444,31 +427,6 @@ export function CollectionEditor(props: {
           {...stylex.props(styles.checkbox)}
         />
         <span {...stylex.props(s.muted)}>Add created_at / updated_at columns automatically</span>
-      </div>
-
-      <div>
-        <label {...stylex.props(s.label)}>MCP exposure</label>
-        <div {...stylex.props(styles.modeSeg)} role="radiogroup" aria-label="MCP exposure">
-          <For each={MCP_COLLECTION_MODES}>
-            {(mode) => (
-              <button
-                type="button"
-                role="radio"
-                aria-checked={mcpMode() === mode}
-                title={MCP_MODE_HINTS[mode]}
-                onClick={() => {
-                  if (mcpMode() === mode) return
-                  setMcpMode(mode)
-                  touch()
-                }}
-                {...stylex.props(styles.modeBtn, mcpMode() === mode && styles.modeBtnActive)}
-              >
-                {mode === 'read' ? 'Read only' : mode === 'write' ? 'Read + write' : 'Hidden'}
-              </button>
-            )}
-          </For>
-        </div>
-        <p {...stylex.props(s.muted)}>{MCP_MODE_HINTS[mcpMode()]}</p>
       </div>
 
       <div {...stylex.props(styles.fieldsHeader)}>

@@ -34,12 +34,6 @@ signed URLs from the API; a configured `PANEL_ASSET_SECRET` (falling back to
 
 - [Panels](docs/panels.md)
 
-## What's new
-
-No change in this release.
-
-See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#020--2026-09-28) for every release.
-
 ## License
 
 MIT

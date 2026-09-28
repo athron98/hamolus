@@ -206,69 +206,39 @@ export async function resolveWorkspaceDependencyVersion(
 }
 
 /**
- * The fallback range for an `@hamolus/*` package whose real version cannot be discovered.
+ * The version range to use for an `@hamolus/*` package whose real version is unknown.
  *
  * The monorepo is still pre-release, so a generated project can ask for a version the
- * registry does not have yet. A caret range on the release that last shipped keeps such a
- * project installable, whereas `*` would silently accept any future major of an
- * unreleased package.
- *
- * **This is a map and not one constant** because the packages do not all version together:
- * the six core packages ship in lockstep, while the console plugins under
- * `packages/plugins/**` version independently. A single constant is a landmine the first
- * time a release leaves a plugin behind — every plugin would be handed a range for a
- * version it was never published at, and `pnpm install` would fail on a name the user
- * never typed. `pnpm check:package-versions` refuses to let this map drift from the
- * manifests, so the cost of keeping it honest is one command.
- *
- * A name that is missing here falls back to {@link DEFAULT_VERSION_RANGE}, which is the
- * right guess for a package added to this repository later but not yet to this table.
+ * registry does not have yet. `^0.1.0` matches what the console template declares and
+ * keeps such a project installable, whereas `*` would silently accept any future major of
+ * an unreleased package. Shared by {@link resolveDependencyRange} and `hamolus add plugin`
+ * so both write the same range.
  */
-export const FALLBACK_RANGES: Readonly<Record<string, string>> = {
-  '@hamolus/cli': '^0.2.0',
-  '@hamolus/console': '^0.2.0',
-  '@hamolus/core': '^0.2.0',
-  '@hamolus/mcp': '^0.2.0',
-  '@hamolus/panel': '^0.2.0',
-  '@hamolus/types': '^0.2.0',
-  '@hamolus/plugin-console-contracts': '^0.1.0',
-  '@hamolus/plugin-console-kanban': '^0.1.0',
-  '@hamolus/plugin-console-todo': '^0.1.0',
-}
-
-/** What a package absent from {@link FALLBACK_RANGES} falls back to. */
-export const DEFAULT_VERSION_RANGE = '^0.2.0'
-
-/** Resolve the fallback range for one package name. */
-export function fallbackRange(packageName: string): string {
-  return FALLBACK_RANGES[packageName] ?? DEFAULT_VERSION_RANGE
-}
+export const UNPUBLISHED_VERSION_RANGE = '^0.1.0'
 
 /**
  * Rewrite a `workspace:` dependency onto a published version range.
  *
  * Generated projects live outside this monorepo, so a workspace protocol range
  * would break `pnpm install`. The `workspace:` suffix is a pnpm operator, not a
- * version, so `workspace:*` must become a concrete range — a bare caret on the
- * current release would be wrong, and appending the operator to nothing (`^*`) is
- * not even a valid range.
+ * version, so `workspace:*` must become a concrete range — `^0.1.0` alone would be
+ * wrong, and appending the operator to nothing (`^*`) is not even a valid range.
  *
  * `fallbackVersion` is the version discovered from the source package (see
  * {@link resolveWorkspaceDependencyVersion}); when it is missing,
- * {@link fallbackRange} keeps the generated project installable against a
+ * {@link UNPUBLISHED_VERSION_RANGE} keeps the generated project installable against a
  * package that has not been published yet.
  */
 export function resolveDependencyRange(
   version: string | undefined,
   requested: string,
   fallbackVersion?: string,
-  packageName?: string,
 ): string {
   if (!version || !version.startsWith('workspace:')) return requested
 
   const operator = version.slice('workspace:'.length).trim()
   const exact = operator === '*' || operator === '^' || operator === '~' ? '' : operator
-  const resolved = exact || fallbackVersion || fallbackRange(packageName ?? '').replace(/^[\^~]/, '')
+  const resolved = exact || fallbackVersion || UNPUBLISHED_VERSION_RANGE.replace(/^[\^~]/, '')
 
   // `workspace:1.2.3` means "exactly this version".
   return exact ? exact : `^${resolved.replace(/^[\^~]/, '')}`

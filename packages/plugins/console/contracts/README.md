@@ -42,11 +42,6 @@ Import the token **values** through the `*.stylex.ts` path (`src/styles.stylex.t
 rather than the package root: the StyleX build plugin resolves theme files only when
 the specifier ends in `.stylex.ts`.
 
-## What's new
-
-Versioned independently of the core packages, and unchanged in this release.
-See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#020--2026-09-28) for every release.
-
 ## License
 
 MIT
