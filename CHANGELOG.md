@@ -10,6 +10,28 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 Nothing yet.
 
+## [0.2.1] — 2026-09-28
+
+A republish. No source change — the code in `0.2.1` is byte-for-byte the code
+that was in `0.2.0`.
+
+### Fixed
+
+- **Four packages could not be installed at all.** `@hamolus/core`,
+  `@hamolus/mcp`, `@hamolus/console` and `@hamolus/panel` were published with
+  the `workspace:*` protocol left literally in their `dependencies`. Only pnpm
+  rewrites that protocol to a real range when packing; the `0.2.0` tarballs
+  were built by `npm publish`, which passes the manifest through untouched. npm
+  refuses that URL type outright, so `npm i @hamolus/core@0.2.0` failed with
+  `EUNSUPPORTEDPROTOCOL` before any code ran. `pnpm publish` produces the
+  correct `@hamolus/types` pin; the `0.2.1` tarballs were built with it.
+- `@hamolus/cli@0.2.0` and `@hamolus/types@0.2.0` were unaffected — neither
+  depends on a workspace sibling — and stayed on the registry. They are
+  republished here anyway, so the six core packages share one version.
+
+If you saw `EUNSUPPORTEDPROTOCOL` installing any `@hamolus/*` package, that is
+this. `pnpm up "@hamolus/*@^0.2.1"` is the fix.
+
 ## [0.2.0] — 2026-09-28
 
 The MCP server's release. A collection is now a first-class thing an agent is
@@ -125,7 +147,8 @@ pnpm up "@hamolus/*@^0.2.0"
 After that, review your collections' `mcp` mode — any collection an agent was
 writing to needs `mcp: 'write'`.
 
-[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/hamolus-labs/hamolus/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/hamolus-labs/hamolus/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hamolus-labs/hamolus/releases/tag/v0.1.0
 

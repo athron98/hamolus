@@ -46,7 +46,7 @@ origin. It is deployed as Worker static assets with
 An **MCP exposure** section in the collection editor, so a collection's agent
 visibility is set where the collection is declared.
 
-See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#020--2026-09-28) for every release.
+See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#021--2026-09-28) for every release.
 
 ## License
 
