@@ -643,6 +643,78 @@ try {
     )
   }
 
+  // "Everything is wired, so `pnpm dev` needs no manual step" is a promise this suite is in
+  // a position to check, and the MCP server was quietly breaking it. The server authenticates
+  // to the core with `CORE_API_TOKEN` or `CORE_ADMIN_KEY`; neither was set, so every tool call
+  // failed with "No CORE_API_TOKEN or CORE_ADMIN_KEY configured for the MCP server." The
+  // giveaway is that the server still starts and still answers `GET /` with 200, so nothing
+  // in the startup output is wrong — and the hint that used to explain it said to copy
+  // `.env.example` over `.dev.vars`, which replaced a working `CORE_API_URL` with a
+  // placeholder for a deployed core.
+  {
+    const withMcp = join(root, 'mcp-wired')
+    const created = hamolus(root, [
+      'create', 'wired', '--link', REPO, '-o', withMcp, '-y',
+      '--with-mcp', '--with-console',
+    ])
+    ok('create with an MCP server succeeds', created.status === 0, `${created.stdout}\n${created.stderr}`)
+    if (created.status !== 0) throw new Error('create --with-mcp failed')
+
+    const mcpVars = join(withMcp, 'mcp', '.dev.vars')
+    ok(
+      'the MCP server gets a .dev.vars with a key, so no file has to be copied by hand',
+      existsSync(mcpVars),
+      'mcp/.dev.vars',
+    )
+
+    if (existsSync(mcpVars)) {
+      const readVar = (path, name) => {
+        for (const line of readFileSync(path, 'utf8').split('\n')) {
+          const trimmed = line.trim()
+          if (trimmed === '' || trimmed.startsWith('#')) continue
+          if (trimmed.startsWith(`${name}=`)) return trimmed.slice(name.length + 1).trim()
+        }
+        return undefined
+      }
+      const coreKey = readVar(join(withMcp, 'core', '.dev.vars'), 'ADMIN_KEY')
+      const mcpKey = readVar(mcpVars, 'CORE_ADMIN_KEY')
+      ok(
+        'the MCP server is handed the core\'s own admin key',
+        Boolean(coreKey) && mcpKey === coreKey,
+        `core=${coreKey ? 'set' : 'missing'} mcp=${mcpKey ? 'set' : 'missing'}`,
+      )
+      ok(
+        'the MCP key is not written into the committed wrangler.jsonc',
+        !/"CORE_ADMIN_KEY"\s*:/.test(readFileSync(join(withMcp, 'mcp', 'wrangler.jsonc'), 'utf8')),
+        'a secret in `vars` is committed, and a secret and a var can never share a name',
+      )
+      ok(
+        'the project .gitignore covers mcp/.dev.vars',
+        /\*\.dev\.vars/.test(readFileSync(join(withMcp, '.gitignore'), 'utf8')),
+      )
+    }
+
+    // A core-less project must not get one. Its core runs somewhere else, and a key the CLI
+    // did not generate is not something to invent.
+    const noCoreMcp = join(root, 'mcp-no-core')
+    hamolus(root, ['create', 'remote', '--link', REPO, '-o', noCoreMcp, '-y', '--no-core', '--mcp'])
+    ok(
+      'a core-less MCP server gets no invented key',
+      !existsSync(join(noCoreMcp, 'mcp', '.dev.vars')),
+      'mcp/.dev.vars',
+    )
+
+    // `MCP_BEARER_TOKEN` is a different token pointing the other way: it authenticates
+    // callers to `/mcp`. Telling someone to set it is how a project ends up with an mcp
+    // server that still cannot reach its own core.
+    const envExample = readFileSync(join(withMcp, 'mcp', '.env.example'), 'utf8')
+    ok(
+      'the MCP .env.example names the variable the server actually reads',
+      /CORE_ADMIN_KEY|CORE_API_TOKEN/.test(envExample),
+      'CORE_ADMIN_KEY or CORE_API_TOKEN is what authenticates the server to the core',
+    )
+  }
+
   // A panel is not a process, so it must not appear in the root `dev`. A `--filter` for a
   // path with no `dev` script fails the whole parallel run, which would make asking for
   // a panel the fastest way to break `pnpm dev`.

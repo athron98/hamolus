@@ -452,12 +452,16 @@ A part generated on its own — a console, an MCP server, a panel, a site — ta
 that already runs somewhere else, and each one is told where at runtime:
 
   console   asks for the API endpoint in its navbar, and remembers it per browser
-  mcp       reads CORE_API_URL from mcp/.env
+  mcp       reads CORE_API_URL and CORE_ADMIN_KEY from mcp/.dev.vars
   site      reads PUBLIC_HAMOLUS_ORIGIN from site/.env (HAMOLUS_API_ORIGIN on Next.js)
   panel     a page inside the console, which already knows the core
 
 Nothing here is read by Wrangler, because there is no Worker in this project. Copy this
 file to .env if a part you add reads one of the names above.
+
+A part that ships a Worker of its own — the MCP server does — keeps its settings in its own
+\`.dev.vars\` next to its \`wrangler.jsonc\`, not in this file. Secrets go in \`.dev.vars\`;
+plain vars are fine in either.
 
 # Which core the console signs in to.
 ADMIN_KEY=
@@ -623,7 +627,9 @@ export const CORE_LESS_PARTS = {
   mcp: {
     phrase: 'an MCP server',
     addressing:
-      'Set `CORE_API_URL` in `mcp/.env` to the core\'s `/api` base, and `MCP_BEARER_TOKEN` to a scoped user token.',
+      'Set `CORE_API_URL` in `mcp/.dev.vars` to the core\'s `/api` base, and `CORE_ADMIN_KEY` to that core\'s admin key ' +
+      '(or `CORE_API_TOKEN` to a scoped user token). `MCP_BEARER_TOKEN` is a different thing: it authenticates callers ' +
+      'to `/mcp`, not the server to the core.',
     withFlag: '--with-mcp',
   },
   site: {

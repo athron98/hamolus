@@ -10,6 +10,31 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 Nothing yet.
 
+## [0.2.8] — 2026-09-28
+
+### Added
+
+- **The MCP server arrives wired.** `hamolus create --with-mcp` now writes `mcp/.dev.vars`
+  holding the same `ADMIN_KEY` as the `core/.dev.vars` it generated a moment earlier, so
+  `pnpm dev` authenticates with nothing to copy and nothing to paste. Before this the server
+  had `CORE_API_URL` and no way to authenticate: it started cleanly, answered `GET /` with
+  200, and then failed *every tool call* with "No CORE_API_TOKEN or CORE_ADMIN_KEY configured
+  for the MCP server." The key goes in `.dev.vars` rather than `wrangler.jsonc` `vars`
+  because `vars` is committed, and a secret and a var can never share a name. A core-less
+  project gets nothing written and is told what to fill in, since its core runs elsewhere.
+
+### Fixed
+
+- **The hint no longer tells you to copy `mcp/.env.example` over `mcp/.dev.vars`.** That
+  instruction replaced a working `CORE_API_URL` with a placeholder for a *deployed* core, and
+  then asked for a key on top of the damage.
+- **Three places named the wrong token.** `MCP_BEARER_TOKEN` authenticates callers *to*
+  `/mcp`; it is not how the server authenticates to the core. That is `CORE_API_TOKEN`, or
+  `CORE_ADMIN_KEY` to have one minted. The core-less project notes, the part descriptions
+  and the generated `.env.example` all now name the variable the code actually reads, and
+  say `.dev.vars` rather than `.env`, since that is where secrets belong next to a
+  `wrangler.jsonc`.
+
 ## [0.2.7] — 2026-09-28
 
 ### Fixed
@@ -378,7 +403,8 @@ pnpm up "@hamolus/*@^0.2.0"
 After that, review your collections' `mcp` mode — any collection an agent was
 writing to needs `mcp: 'write'`.
 
-[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.8...HEAD
+[0.2.8]: https://github.com/hamolus-labs/hamolus/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/hamolus-labs/hamolus/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/hamolus-labs/hamolus/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/hamolus-labs/hamolus/compare/v0.2.4...v0.2.5

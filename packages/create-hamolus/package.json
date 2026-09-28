@@ -1,6 +1,6 @@
 {
   "name": "create-hamolus",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "The `npm create hamolus@latest` initializer: asks twelve questions, then creates a Hamolus project with a core, and a console, MCP server, site or seed if you want one.",
   "keywords": [
     "create-hamolus",
