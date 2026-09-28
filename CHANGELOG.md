@@ -10,7 +10,7 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 Nothing yet.
 
-## [0.2.4] — 2026-09-28
+## [0.2.5] — 2026-09-28
 
 ### Added
 
@@ -22,6 +22,31 @@ Nothing yet.
   an empty console is merely empty. `--seed <name>` and `--no-seed` answer it from the
   command line, and the closing hint says to run it *after* `pnpm dev`, because a seed POSTs
   to a core that has to be listening first.
+
+### Fixed
+
+- **`hamolus create <name> --seed basic` no longer throws the flag away.** `seed` was
+  missing from the list of options that route a `create` through the wizard, so the command
+  took the plain path, wrote a bare core, and exited 0 having dropped the seed. The same
+  bug 0.2.3 fixed for `--console --mcp --site`, in a flag added after that fix.
+- **`--no-core` was ignored whenever a part flag was also present.** The flag was read only
+  by `runCreate`, so `--no-core --seed basic` reached the wizard, found no part flag,
+  defaulted to having a core, and built one — the command line said "no core" and got a
+  core. The core-flag guard now runs on both paths, before any question is asked, so
+  `--no-core --mode bridge --with-console` is an error instead of a workspace whose every
+  core setting describes a Worker that is never generated.
+- **A seed in a project with no core is refused.** It used to be scaffolded into
+  `seeds/basic/` and fail on its first fetch, which is the failure mode the part-level
+  `--no-core` guard was written to prevent; it had simply not been listed there.
+- **A seed no longer tells you to use `ADMIN_KEY=dev-admin-key-change-me`.** The wizard
+  generates a random admin key into `core/.dev.vars`, so the literal was a 401, and the
+  error it produced pointed at the core rather than at the instruction. The seed script, its
+  README, the per-part hint and the wizard's closing hint all read the real key now.
+
+## [0.2.4] — 2026-09-28
+
+### Added
+
 - **Part flags come in two spellings: `--console` and `--with-console`.** The bare
   flag is `hamolus add <part>` applied to a new project, so it makes *only* that part and
   no core. `--with-<part>` is the whole project — a core, its mode, its land and colony,
@@ -52,23 +77,6 @@ Nothing yet.
 
 ### Fixed
 
-- **`hamolus create <name> --seed basic` no longer throws the flag away.** `seed` was
-  missing from the list of options that route a `create` through the wizard, so the command
-  took the plain path, wrote a bare core, and exited 0 having dropped the seed. The same
-  bug 0.2.3 fixed for `--console --mcp --site`, in a flag added after that fix.
-- **`--no-core` was ignored whenever a part flag was also present.** The flag was read only
-  by `runCreate`, so `--no-core --seed basic` reached the wizard, found no part flag,
-  defaulted to having a core, and built one — the command line said "no core" and got a
-  core. The core-flag guard now runs on both paths, before any question is asked, so
-  `--no-core --mode bridge --with-console` is an error instead of a workspace whose every
-  core setting describes a Worker that is never generated.
-- **A seed in a project with no core is refused.** It used to be scaffolded into
-  `seeds/basic/` and fail on its first fetch, which is the failure mode the part-level
-  `--no-core` guard was written to prevent; it had simply not been listed there.
-- **A seed no longer tells you to use `ADMIN_KEY=dev-admin-key-change-me`.** The wizard
-  generates a random admin key into `core/.dev.vars`, so the literal was a 401, and the
-  error it produced pointed at the core rather than at the instruction. The seed script, its
-  README, the per-part hint and the wizard's closing hint all read the real key now.
 - **`--console` was briefly read as `--with-console`.** The flag lookup capitalised the
   first letter unconditionally, so with an empty prefix it asked for a `Console` key that
   does not exist, read nothing, and fell through to "no flags given" — the default, which
@@ -324,7 +332,8 @@ pnpm up "@hamolus/*@^0.2.0"
 After that, review your collections' `mcp` mode — any collection an agent was
 writing to needs `mcp: 'write'`.
 
-[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/hamolus-labs/hamolus/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/hamolus-labs/hamolus/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/hamolus-labs/hamolus/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/hamolus-labs/hamolus/compare/v0.2.1...v0.2.2
