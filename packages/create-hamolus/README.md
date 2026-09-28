@@ -3,7 +3,7 @@
 The initializer behind `npm create hamolus@latest`.
 
 ```bash
-npm create hamolus@latest          # ten questions, then a project
+npm create hamolus@latest          # twelve questions, then a project
 npm create hamolus@latest acme     # the same, with the name already answered
 ```
 

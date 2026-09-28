@@ -19,14 +19,14 @@ configs/    wrangler presets (staging, production, per land)
 ## Quickstart
 
 ```bash
-npm create hamolus@latest     # asks ten questions, then builds the project
+npm create hamolus@latest     # asks twelve questions, then builds the project
 ```
 
 or, if you would rather answer with flags — or already have the CLI:
 
 ```bash
 pnpm add -g @hamolus/cli     # or: npx @hamolus/cli
-hamolus init                  # the same ten questions
+hamolus init                  # the same twelve questions
 hamolus create acme           # or skip them entirely
 cd acme
 pnpm install
@@ -47,7 +47,7 @@ hamolus add console          # admin app
 hamolus add panel basic      # a generated panel app
 hamolus add mcp              # MCP server for AI agents
 hamolus add site blog        # a public Astro site reading the core over REST
-hamolus add seed basic       # demo data
+hamolus add seed basic       # example content, so a new site has something to show
 hamolus add configuration basic
 ```
 
@@ -56,6 +56,34 @@ Each flag adds that part and nothing else, so a project is one line:
 ```bash
 npm create hamolus@latest acme --with-console --with-mcp --with-site nextjs
 ```
+
+### Example content
+
+A new project has an empty database, so a new site renders an empty page — which reads as a
+broken site rather than an empty one. A seed is a self-cleaning Node script that fills the
+core with a few records, and the wizard offers it as question 12:
+
+```bash
+hamolus create acme --with-site astro        # question 12 defaults to yes: a site wants content
+hamolus create acme --with-console          # and to no: a console is only empty
+hamolus create acme --with-site astro --seed basic   # or say so
+hamolus create acme --with-site astro --no-seed      # or decline it
+```
+
+Run it once the core is up, which is why it is not part of `pnpm dev` — a seed is a one-shot
+script, and starting it before the core listens is a connection error:
+
+```bash
+pnpm dev
+ADMIN_KEY=$(grep '^ADMIN_KEY=' core/.dev.vars | cut -d= -f2-) pnpm -F ./seeds/basic seed
+```
+
+Re-running it is safe: the script drops the collections and media it owns before recreating
+them, so it never duplicates records.
+
+A seed has no `--with-` spelling, unlike the parts above. It writes to a core over HTTP, so
+"a seed with no core" is a script that can never run — `hamolus create acme --console --seed
+basic` is refused rather than scaffolded into a directory that fails on its first fetch.
 
 ### `--console` or `--with-console`
 

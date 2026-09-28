@@ -10,7 +10,7 @@
  * `hamolus init` — the guided way to create a project. This is what
  * `npm create hamolus@latest` runs.
  *
- * The wizard owns no scaffolding logic. It asks ten questions and then calls
+ * The wizard owns no scaffolding logic. It asks twelve questions and then calls
  * `hamolus create` and `hamolus add …` with the answers, so a wizard run and the
  * equivalent hand-written command line produce the same files. That is the whole design:
  * the interactive path is a front end for the flags, not a second implementation of
@@ -31,8 +31,15 @@ import { runAddConsole } from './add-console.js'
 import { runAddMcp } from './add-mcp.js'
 import { partAddressing } from './create.js'
 import { runAddPanel } from './add-panel.js'
+import { runAddSeed } from './add-seed.js'
 import { DEFAULT_SITE_FRAMEWORK, runAddSite, SITE_DIRECTORY } from './add-site.js'
-import { BASIC_TEMPLATE, DEFAULT_DEV_HOST, DEFAULT_SCOPE_NAME, runCreate } from './create.js'
+import {
+  BASIC_TEMPLATE,
+  DEFAULT_DEV_HOST,
+  DEFAULT_SCOPE_NAME,
+  guardNoCore,
+  runCreate,
+} from './create.js'
 
 /**
  * Project names as `create` validates them, restated here so the wizard can reject a
@@ -179,6 +186,59 @@ function resolveParts(options: ParsedArgs['options']): Parts {
   }
 }
 
+/** The name a seed gets when the answer is a plain yes. */
+const DEFAULT_SEED_NAME = 'basic'
+
+/**
+ * Question 12: which seed, if any.
+ *
+ * Split out of `ask` because this one answer has three sources and two exclusions, and
+ * folding that into the middle of a function that already holds eleven other questions is how
+ * the "skipped without a core" rule ends up documented but not implemented.
+ */
+async function resolveSeed(
+  input: {
+    hasCore: boolean
+    askParts: boolean
+    site: string | undefined
+    options: ParsedArgs['options']
+  },
+  prompter: Prompter,
+): Promise<string | undefined> {
+  const { hasCore, askParts, site, options } = input
+
+  // A seed is a script that POSTs to a core. With no core there is nothing to talk to, so
+  // this is refused rather than skipped, and the check sits *above* the flag check on
+  // purpose: `--seed` is the usual way to reach it (`--console --seed basic`), and a
+  // `seeds/` directory holding a script that fails on its first fetch is a worse answer
+  // than an error that names the contradiction.
+  if (!hasCore && options.seed !== undefined) {
+    throw new Error(
+      `Cannot add seed "${options.seed}": a seed writes to a core over HTTP, and this ` +
+        'project has none.\n' +
+        'Drop the part flags for a core to write to, or drop --seed and add the seed ' +
+        'later with `hamolus add seed` in a project that has a core.',
+    )
+  }
+
+  // A flag answered it. `--seed basic` names the seed; `--no-seed` says no, and exists
+  // so a script can answer every question without leaving this one open.
+  if (options.seed !== undefined) return options.seed
+  if (options.noSeed) return undefined
+
+  // No core, or a flag already named the parts: nothing to ask.
+  if (!hasCore || !askParts) return undefined
+
+  const answer = await prompter.maybe(
+    site
+      ? 'Add a seed with example content for the site?'
+      : 'Add a seed with example content?',
+    { yes: DEFAULT_SEED_NAME, no: 'none', defaultKind: site ? 'yes' : 'no' },
+  )
+  if (answer.kind === 'no') return undefined
+  return answer.kind === 'yes' ? DEFAULT_SEED_NAME : answer.value
+}
+
 /**
  * The parts a plan holds, as flags — `['console']`, `['console', 'mcp']`.
  *
@@ -234,6 +294,8 @@ interface Plan {
   siteId: string
   /** Undefined means no panel; otherwise the panel name to generate. */
   panel?: string
+  /** Undefined means no seed; otherwise the seed name to generate. Always needs a core. */
+  seed?: string
 }
 
 /**
@@ -369,7 +431,7 @@ function shorten(stem: string, suffix: string, max: number): string {
 }
 
 /**
- * Ask the ten questions.
+ * Ask the twelve questions.
  *
  * Each one reads `flag ?? ask(...)`, which is what makes the wizard composable: anything
  * already decided on the command line is not asked again. The order is the order a
@@ -383,8 +445,17 @@ async function ask(args: ParsedArgs, prompter: Prompter): Promise<Plan> {
   // that is only a console has no core name to be asked for, no mode to pick, no land or
   // colony to route, no core template to choose and no secrets to generate — six questions
   // whose every answer would be thrown away with the directory they describe.
+  // Refused before anything is asked, so a contradictory command line costs no questions.
+  guardNoCore(options)
+
   const parts = resolveParts(options)
-  const { hasCore } = parts
+  // `--no-core` wins over the part flags. It used to be read only by `runCreate`, so
+  // `hamolus create acme --no-core --seed basic` reached this wizard, found no part flag,
+  // defaulted `hasCore` to true and built a full core with a seed in it — the flag said
+  // "no core" and the command wrote one. The part flags describe *what else* to add, and
+  // only they can imply a core; `--no-core` is the explicit statement, so it is read here
+  // too, where the decision is made rather than downstream where it was already too late.
+  const hasCore = options.noCore ? false : parts.hasCore
 
   // 1. Project name — also the directory it goes in, so it has to be a valid name.
   const suggested = positionals[0] ?? guessName()
@@ -585,6 +656,21 @@ async function ask(args: ParsedArgs, prompter: Prompter): Promise<Plan> {
         ? 'admin'
         : panelAnswer.value
 
+  // 12. A seed, so the site has something to show and the console has rows to browse.
+  //
+  //     Skipped entirely without a core: a seed is a script that POSTs to a core, so
+  //     asking the question in a core-less project would offer something that can never
+  //     run. It is also skipped when a flag already named the parts, for the reason the
+  //     three above are — `--with-site astro` says what this project is, and a second
+  //     thing added on the way past is what makes a flag mean "only this".
+  //
+  //     The default follows the site, not a fixed yes or no. A public site with no records
+  //     renders an empty page, which is the thing a new user blames on the framework; a
+  //     console with no records is merely empty, and `hamolus add seed basic` is one
+  //     command away. So a site makes yes the default and everything else makes no, which
+  //     is why the prompt says which of the two it is offering.
+  const seed = await resolveSeed({ hasCore, askParts, site, options }, prompter)
+
   return {
     name,
     hasCore,
@@ -607,6 +693,7 @@ async function ask(args: ParsedArgs, prompter: Prompter): Promise<Plan> {
     // another one whenever the default does not fit.
     siteId: defaultSiteId(name),
     panel,
+    seed,
   }
 }
 
@@ -708,6 +795,7 @@ export async function runInit(args: ParsedArgs): Promise<void> {
     if (plan.mcp) await runAddMcp(argsFor(args, ['mcp']))
     if (plan.site) await runAddSite(argsFor(args, ['site', plan.siteId], { template: plan.site }))
     if (plan.panel) await runAddPanel(argsFor(args, ['panel', plan.panel]))
+    if (plan.seed) await runAddSeed(argsFor(args, ['seed', plan.seed]))
   } finally {
     process.chdir(previous)
   }
@@ -746,5 +834,17 @@ export async function runInit(args: ParsedArgs): Promise<void> {
   // The project's own `dev` script starts the core and every part that was asked for,
   // so it is what the last line should name. `hamolus list` is the way to see what the
   // answers produced, which is the question people have after a wizard run.
-  next([`cd ${target}`, 'pnpm install', 'pnpm dev', 'hamolus list'])
+  //
+  // A seed gets its own line, and only when there is one, because the script it generated
+  // is the whole point of asking: a site with an empty collection and no instruction to
+  // fill it looks exactly like a broken site. The line is after `pnpm dev` and says so,
+  // because the seed POSTs to a core that has to be listening first — running it
+  // immediately is a connection error, not a hint.
+  const afterDev = plan.seed
+    ? [
+        `ADMIN_KEY=$(grep "^ADMIN_KEY=" core/.dev.vars | cut -d= -f2-) ` +
+          `pnpm -F ./seeds/${plan.seed} seed   # once the core above is up`,
+      ]
+    : []
+  next([`cd ${target}`, 'pnpm install', 'pnpm dev', ...afterDev, 'hamolus list'])
 }

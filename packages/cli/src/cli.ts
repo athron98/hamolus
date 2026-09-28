@@ -74,6 +74,13 @@ const WIZARD_OPTIONS = [
   'withMcp',
   'withSite',
   'withPanel',
+  // `seed` and `noSeed` are here for the same reason as the rest, and the omission was
+  // the exact bug this list exists to prevent: `hamolus create acme --seed basic` used to
+  // fall through to the plain `create` path, write a bare core, and exit 0 having thrown
+  // the flag away. A flag that is accepted, documented, and silently dropped is worse than
+  // one that is refused, because the script that passed it cannot tell.
+  'seed',
+  'noSeed',
 ] as const
 
 function wizardFlags(args: ParsedArgs): boolean {

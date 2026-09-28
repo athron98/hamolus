@@ -65,14 +65,18 @@ no dependencies.
 ## Run
 
 \`\`\`bash
-cd seeds/${name}
+# the admin key is in core/.dev.vars — the wizard generated it
+ADMIN_KEY=$(grep '^ADMIN_KEY=' core/.dev.vars | cut -d= -f2-)
 
-# against a local core
-BASE=http://localhost:8787 ADMIN_KEY=dev-admin-key-change-me pnpm seed
+# against the local core
+BASE=http://localhost:8787 pnpm seed
 
 # against a deployed core
-BASE=https://<core-host>/api ADMIN_KEY=<key> pnpm seed
+BASE=https://<core-host> ADMIN_KEY=<key> pnpm seed
 \`\`\`
+
+\`ADMIN_KEY\` has no default because there is none to have: the wizard generated one
+into \`core/.dev.vars\`, and that is the key the core is actually expecting.
 
 ## What "self-cleaning" means
 
@@ -86,7 +90,7 @@ objects they own.
 
 | Variable   | Default                     | Meaning                       |
 | ---------- | --------------------------- | ----------------------------- |
-| \`BASE\`     | \`http://localhost:8787\`    | Core API base (include \`/api\`) |
+| \`BASE\`     | \`http://localhost:8787\`    | Core origin (the script adds \`/api\`) |
 | \`ADMIN_KEY\` | —                         | Admin key for the token       |
 | \`DRY_RUN\`  | \`false\`                    | Print the plan, write nothing |
 `
@@ -143,9 +147,13 @@ export async function runAddSeed(args: ParsedArgs): Promise<void> {
       relativePath,
       files,
       origin: `seed template (${template.origin})`,
+      // The hint has to survive a generated key. `ADMIN_KEY=dev-admin-key-change-me` is
+      // the pre-generation default, and printing it next to a core that now holds a
+      // random one is a 401 waiting to happen — so the hint reads the real key instead.
       hints: [
         'pnpm install',
-        `BASE=http://localhost:8787 ADMIN_KEY=dev-admin-key-change-me pnpm -F ./seeds/${name} seed`,
+        'ADMIN_KEY=$(grep "^ADMIN_KEY=" core/.dev.vars | cut -d= -f2-) ' +
+          `pnpm -F ./seeds/${name} seed`,
       ],
     },
   )

@@ -221,25 +221,7 @@ export function parseCreateOptions(args: ParsedArgs): CreateOptions {
   // describes a Worker that is not being generated. The wizard never produces this pair —
   // it decides the core before it reaches this point — so the check costs one line and
   // turns a silently-wrong project into an error.
-  if (args.options.noCore) {
-    const coreOnly = [
-      ['--mode', args.options.mode],
-      ['--core', args.options.core],
-      ['--core-name', args.options.coreName],
-      ['--land', args.options.land],
-      ['--colony', args.options.colony],
-      ['--jwt', args.options.jwt],
-      ['--key', args.options.key],
-    ].filter(([, value]) => value !== undefined)
-    if (coreOnly.length > 0) {
-      const names = coreOnly.map(([name]) => name).join(', ')
-      throw new Error(
-        `Cannot combine --no-core with ${names}: those configure a core, and --no-core ` +
-          'means this project has none.\n' +
-          'Drop --no-core to get a core, or drop the core flags to get just the workspace.',
-      )
-    }
-  }
+  guardNoCore(args.options)
 
   const output = args.options.output
     ? resolve(process.cwd(), args.options.output)
@@ -262,6 +244,41 @@ export function parseCreateOptions(args: ParsedArgs): CreateOptions {
     force: args.flags.force,
     dryRun: args.flags.dryRun,
   }
+}
+
+/**
+ * `--no-core` means this project has no core, so every flag that configures one is a
+ * contradiction rather than a preference.
+ *
+ * Exported and called from the wizard as well as from here, because the wizard can reach
+ * `runCreate` with a different set of options than the command line had: `argsFor` rebuilds
+ * them, so a check that only ran at the edge was skipped for every wizard run. `--no-core
+ * --mode bridge` through a part flag wrote a workspace whose every core setting described
+ * a Worker that was never generated.
+ */
+export function guardNoCore(options: ParsedArgs['options']): void {
+  if (!options.noCore) return
+  const coreOnly = [
+    ['--mode', options.mode],
+    ['--core', options.core],
+    ['--core-name', options.coreName],
+    ['--land', options.land],
+    ['--colony', options.colony],
+    ['--jwt', options.jwt],
+    ['--key', options.key],
+    // A seed is not a core setting, but it has the same requirement: the script POSTs to
+    // a core, so a project with no core could never run it. Listing it here is what makes
+    // `--no-core --seed basic` an error instead of a `seeds/` directory that fails on its
+    // first fetch.
+    ['--seed', options.seed],
+  ].filter(([, value]) => value !== undefined)
+  if (coreOnly.length === 0) return
+  const names = coreOnly.map(([name]) => name).join(', ')
+  throw new Error(
+    `Cannot combine --no-core with ${names}: ${names.includes('--seed') ? 'a seed needs' : 'those configure'} ` +
+      'a core, and --no-core means this project has none.\n' +
+      'Drop --no-core to get a core, or drop the core flags to get just the workspace.',
+  )
 }
 
 function scopeFor(name: string): string {

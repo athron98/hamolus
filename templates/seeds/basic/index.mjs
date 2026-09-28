@@ -15,8 +15,12 @@
 //     is safe to run against a core that already holds other data.
 //
 // Usage:
-//   BASE=http://localhost:8787 ADMIN_KEY=dev-admin-key-change-me pnpm seed
+//   ADMIN_KEY=$(grep '^ADMIN_KEY=' core/.dev.vars | cut -d= -f2-) pnpm seed
 //   BASE=https://<core-host> ADMIN_KEY=<key> DRY_RUN=1 pnpm seed
+//
+// ADMIN_KEY has no default, deliberately. The wizard generates a random one into
+// core/.dev.vars, so a default here would be a wrong key that produced a confusing 401
+// instead of a clear "ADMIN_KEY is required".
 //
 // BASE is the core's origin. The `/api` prefix is added by this script.
 
@@ -164,7 +168,10 @@ async function createRecords() {
 
 async function main() {
   if (!KEY) {
-    throw new Error('ADMIN_KEY is required. Try: ADMIN_KEY=dev-admin-key-change-me pnpm seed')
+    throw new Error(
+      'ADMIN_KEY is required. The wizard generated one for this project:\n' +
+        '  ADMIN_KEY=$(grep "^ADMIN_KEY=" core/.dev.vars | cut -d= -f2-) pnpm seed',
+    )
   }
 
   await login()

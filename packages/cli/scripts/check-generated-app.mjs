@@ -448,6 +448,87 @@ try {
     ok('the refused mix writes nothing', !existsSync(mixed))
   }
 
+  // 6c. A seed. It is the one part that writes to a core, so it is the one part with no
+  //     bare/`--with-` pair, and the rules that follow from that are all about refusal
+  //     rather than scaffolding: a seed in a project with no core is a script that fails on
+  //     its first fetch, so it has to be an error the person wrote rather than a directory
+  //     nobody opens until a site renders empty.
+  {
+    const withSeed = join(root, 'with-seed')
+    const created = hamolus(root, [
+      'create', 'withseed', '--link', REPO, '-o', withSeed, '-y', '--with-site', 'astro', '--seed', 'basic',
+    ])
+    ok(
+      'create --seed basic succeeds',
+      created.status === 0,
+      `${created.stdout}\n${created.stderr}`,
+    )
+    if (created.status === 0) {
+      const recorded = (JSON.parse(readFileSync(join(withSeed, 'hamolus.json'), 'utf8')).parts ?? [])
+        .map((part) => part.kind)
+      ok(
+        'the seed is recorded as a part',
+        recorded.includes('seed') && recorded.includes('site') && recorded.includes('core'),
+        recorded.join(', '),
+      )
+      ok(
+        'the seed script is generated',
+        existsSync(join(withSeed, 'seeds', 'basic', 'index.mjs')),
+      )
+
+      // A seed is a one-shot script with a `seed` entry and no `dev` entry, so joining the
+      // root `dev` would make pnpm fail the whole parallel run on a missing script.
+      const dev = JSON.parse(readFileSync(join(withSeed, 'package.json'), 'utf8')).scripts?.dev ?? ''
+      ok('a seed is left out of pnpm dev', !dev.includes('seed'), dev)
+
+      // The key the seed needs is the one the wizard generated. The pre-generation default
+      // is printed in neither the hint nor the script, because a project that generates a
+      // random key and then tells you to use a literal one fails with a 401 that points at
+      // the core rather than at the README.
+      const hint = readFileSync(join(withSeed, 'seeds', 'basic', 'index.mjs'), 'utf8')
+      ok(
+        'the seed does not tell you to use a hard-coded admin key',
+        !hint.includes('dev-admin-key-change-me'),
+        'the script still names the pre-generation default',
+      )
+    }
+
+    // `--no-seed` has to be a real answer, not the absence of one. A script that wants a
+    // core and no seed cannot express that by simply not passing `--seed`.
+    const noSeed = join(root, 'no-seed')
+    const declined = hamolus(root, [
+      'create', 'noseed', '--link', REPO, '-o', noSeed, '-y', '--with-site', 'astro', '--no-seed',
+    ])
+    ok('create --no-seed succeeds', declined.status === 0, `${declined.stdout}\n${declined.stderr}`)
+    ok(
+      'create --no-seed writes no seed',
+      !existsSync(join(noSeed, 'seeds')),
+    )
+
+    // Both refusals. Without these, `--seed` on a core-less project is one refactor away
+    // from being accepted again, and nothing else in the suite would notice.
+    for (const [label, args] of [
+      ['--no-core', ['--no-core', '--seed', 'basic']],
+      ['a bare part flag', ['--console', '--seed', 'basic']],
+    ]) {
+      const out = join(root, `refuse-seed-${label.replace(/\W/g, '')}`)
+      const refused = hamolus(root, [
+        'create', 'refuse', '--link', REPO, '-o', out, '-y', ...args,
+      ])
+      ok(
+        `a seed is refused alongside ${label}`,
+        refused.status !== 0,
+        `${refused.stdout}\n${refused.stderr}`,
+      )
+      ok(
+        `the ${label} refusal names the seed`,
+        /--seed/.test(refused.stderr),
+        refused.stderr,
+      )
+      ok(`the ${label} refusal writes nothing`, !existsSync(out))
+    }
+  }
+
   // A panel is not a process, so it must not appear in the root `dev`. A `--filter` for a
   // path with no `dev` script fails the whole parallel run, which would make asking for
   // a panel the fastest way to break `pnpm dev`.

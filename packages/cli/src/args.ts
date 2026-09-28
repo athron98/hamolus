@@ -106,6 +106,18 @@ export interface ParsedArgs {
      */
     noCore?: boolean
     /**
+     * The seed to generate, from `--seed <name>`.
+     *
+     * One flag rather than a `--seed`/`--with-seed` pair: a seed is a script that `POST`s
+     * to a core, so "a seed with no core" is not a project, it is a script that can never
+     * succeed. Every other part got two spellings because each one genuinely can stand
+     * alone against a core elsewhere; this one cannot, and pretending otherwise would have
+     * produced a `--seed` flag that scaffolds something dead.
+     */
+    seed?: string
+    /** `--no-seed`: answer question 12 with no. Needed for a script to *skip* it. */
+    noSeed?: boolean
+    /**
      * What a core-less project is for, e.g. `['console']` — the parts `--no-core` is being
      * used to make room for.
      *
@@ -157,6 +169,12 @@ const OPTIONS = {
   'with-site': { type: 'string' },
   'with-panel': { type: 'string' },
   'no-core': { type: 'boolean' },
+  // A seed writes to a core over HTTP, so it is not a part that can live without one
+  // and gets no bare/`--with-` pair: there is only "add a seed", which implies a core.
+  // `--no-seed` is here so a question can be answered *no* from the command line, which
+  // every other question in the wizard can do.
+  seed: { type: 'string' },
+  'no-seed': { type: 'boolean' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   clear: { type: 'boolean' },
@@ -222,6 +240,8 @@ export function parse(argv: string[]): ParsedArgs {
       withSite: parsed.values['with-site'],
       withPanel: parsed.values['with-panel'],
       noCore: parsed.values['no-core'],
+      seed: parsed.values.seed,
+      noSeed: parsed.values['no-seed'],
     },
   }
 }

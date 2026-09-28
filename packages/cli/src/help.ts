@@ -153,7 +153,7 @@ function initHelp(): string {
   return [
     `Usage: ${CLI_NAME} init [name] [options]`,
     '',
-    'Asks ten questions and then creates the project, its core and any parts you',
+    'Asks twelve questions and then creates the project, its core and any parts you',
     'asked for. Every question has a flag, and a question whose flag is present is',
     'not asked — so this is a scriptable set of defaults, not a form to fill in.',
     '',
@@ -173,6 +173,9 @@ function initHelp(): string {
     '  9. Add an MCP server?',
     ' 10. Add a public site? — y = astro, n = none, or type a framework or a path',
     ' 11. Add a panel? — y = admin, n = none, or type a name (a page in the console)',
+    ' 12. Add a seed with example content? — a self-cleaning script that fills the core',
+    '     with a few records, so a new site has something to show. Defaults to yes when',
+    '     there is a site and no otherwise. Skipped when the project has no core.',
     '',
     'Questions 2 to 6 are about the core. A project with no core — a bare part flag, or',
     '`--no-core` — skips all five, and so has no land, no colony and no `core/.dev.vars`.',
@@ -198,6 +201,11 @@ function initHelp(): string {
     '      --with-panel <name>  a core, and the panel',
     '      --no-core            an empty workspace: no core, and no part named',
     '',
+    '  A seed writes to a core over HTTP, so it has no bare/`--with-` pair: `--seed`',
+    '  means "a core, and a seed". `--no-seed` answers question 12 with no.',
+    '      --seed <name>       a core, and a seed named this',
+    '      --no-seed           Answer question 12 with no',
+    '',
     '  A bare part flag is `hamolus add <part>` applied to a new project, so the part',
     '  finds a core that already runs somewhere else. `--with-` is the full project.',
     '  Both may be combined; mixing the two spellings is an error, because it would',
@@ -220,6 +228,9 @@ function initHelp(): string {
     `  ${CLI_NAME} create shop --with-console --with-site nextjs`,
     '  # a console on its own, pointed at a core that already runs',
     `  ${CLI_NAME} create shop-console --console`,
+    '',
+    '  # a core, a site, and a seed so the site has something to show',
+    `  ${CLI_NAME} create shop --with-site nextjs --seed basic`,
   ].join('\n')
 }
 

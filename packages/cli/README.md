@@ -8,7 +8,7 @@ npx @hamolus/cli init
 # or, the same wizard:  npm create hamolus@latest
 ```
 
-`init` asks ten questions and then runs the real `create` and `add` commands. Every question
+`init` asks twelve questions and then runs the real `create` and `add` commands. Every question
 has a flag, and a question whose flag is present is not asked — so it is a set of
 scriptable defaults rather than a form. `hamolus init --help` lists all ten.
 
