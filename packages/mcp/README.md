@@ -39,7 +39,7 @@ this server may do with it, across tools, generated tools and resources alike.
 Resources, prompts, generated per-collection tools, and the per-collection
 `mcp` mode — `read` (the default), `write` or `hide`.
 
-See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#021--2026-09-28) for every release.
+See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#022--2026-09-28) for every release.
 
 ## License
 

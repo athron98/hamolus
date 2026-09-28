@@ -25,6 +25,7 @@ const KIND_TITLES: Record<PartKind, string> = {
   plugin: 'Plugins',
   seed: 'Seeds',
   configuration: 'Configurations',
+  site: 'Sites',
 }
 
 const KIND_ORDER: PartKind[] = [
@@ -35,6 +36,7 @@ const KIND_ORDER: PartKind[] = [
   'plugin',
   'seed',
   'configuration',
+  'site',
 ]
 
 export async function runList(_args: ParsedArgs): Promise<void> {
@@ -47,6 +49,14 @@ export async function runList(_args: ParsedArgs): Promise<void> {
 
   heading(`${project.name}  ${dim(`(${project.mode})`)}`)
   info(`scope ${project.scope} · created ${project.createdAt.slice(0, 10)}`)
+  // The two answers a generated part has to inherit rather than guess: which address
+  // the dev servers answer on, and which scope a bare request lands in. They are
+  // optional because a project created before they existed simply has no such key.
+  const facts = [`dev ${project.devHost ?? '127.0.0.1'}`]
+  if (project.mode !== 'independent') {
+    facts.push(`land ${project.land ?? 'default'}`, `colony ${project.colony ?? 'default'}`)
+  }
+  info(facts.join(' · '))
 
   for (const kind of KIND_ORDER) {
     const parts = project.parts.filter((part) => part.kind === kind)

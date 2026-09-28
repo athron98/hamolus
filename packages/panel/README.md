@@ -38,7 +38,7 @@ signed URLs from the API; a configured `PANEL_ASSET_SECRET` (falling back to
 
 No change in this release.
 
-See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#021--2026-09-28) for every release.
+See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#022--2026-09-28) for every release.
 
 ## License
 

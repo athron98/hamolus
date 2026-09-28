@@ -24,7 +24,15 @@ export const PROJECT_FILE = 'hamolus.json'
 /** Bumped when the shape of `hamolus.json` changes incompatibly. */
 export const PROJECT_FILE_VERSION = 1
 
-export type PartKind = 'core' | 'console' | 'panel' | 'mcp' | 'plugin' | 'seed' | 'configuration'
+export type PartKind =
+  | 'core'
+  | 'console'
+  | 'panel'
+  | 'mcp'
+  | 'plugin'
+  | 'seed'
+  | 'configuration'
+  | 'site'
 
 export interface ProjectPart {
   /** Part kind, e.g. `console`. */
@@ -59,6 +67,23 @@ export interface Project {
    * silently reverting half of the project to npm.
    */
   link?: string
+  /**
+   * Interface the generated dev servers bind to, e.g. `0.0.0.0`.
+   *
+   * Recorded so `hamolus add console` generates a `dev` script that reaches the same
+   * hosts the core does. Without it, adding a console after `hamolus create --host
+   * 0.0.0.0` quietly produces a server only the machine it runs on can open.
+   */
+  devHost?: string
+  /**
+   * Land and colony the bare (unprefixed) requests of a multi-tenant core resolve to.
+   *
+   * Absent for an `independent` core, where the scope layer is off and there is nothing
+   * to record. Also absent on projects created before these keys existed — every reader
+   * treats them as optional and falls back to the root scope.
+   */
+  land?: string
+  colony?: string
   createdAt: string
   updatedAt: string
   parts: ProjectPart[]

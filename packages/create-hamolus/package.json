@@ -1,0 +1,48 @@
+{
+  "name": "create-hamolus",
+  "version": "0.2.2",
+  "description": "The `npm create hamolus@latest` initializer: asks ten questions, then creates a Hamolus project with a core, and a console, MCP server or site if you want one.",
+  "keywords": [
+    "create-hamolus",
+    "hamolus",
+    "init",
+    "scaffold",
+    "starter",
+    "template",
+    "generator",
+    "cms",
+    "cloudflare-workers"
+  ],
+  "license": "MIT",
+  "author": "Gilang Albathin Nurhabibi <https://github.com/athron98>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamolus-labs/hamolus.git",
+    "directory": "packages/create-hamolus"
+  },
+  "homepage": "https://github.com/hamolus-labs/hamolus#readme",
+  "bugs": {
+    "url": "https://github.com/hamolus-labs/hamolus/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "bin": {
+    "create-hamolus": "bin/create-hamolus.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prepack": "node ../cli/scripts/copy-license.mjs"
+  },
+  "dependencies": {
+    "@hamolus/cli": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

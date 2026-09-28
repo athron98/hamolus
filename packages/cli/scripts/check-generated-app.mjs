@@ -327,6 +327,105 @@ try {
     /"link"/.test(readFileSync(join(project, 'hamolus.json'), 'utf8')),
     readFileSync(join(project, 'hamolus.json'), 'utf8'),
   )
+
+  // 7. Both site templates, generated into the same project and built from one install.
+  //
+  // A site is the only part that ships no `@hamolus/*` dependency: it reads the core
+  // over plain REST with a hand-written client. That removes the link problems the
+  // console has and replaces them with its own. Both templates fetch the article list
+  // *during the build* — Astro's `getStaticPaths`, Next's `generateStaticParams` — and
+  // neither of those files is ever run by anything else in this repository, so nothing
+  // else in the suite can see what they do when the core is not there.
+  //
+  // The pinned behaviour is the loud one: a build that cannot reach the core must **stop
+  // and say so**. The alternative — degrade to an empty site and exit 0 — is the
+  // failure mode worth being afraid of here, because it deploys: CI is green, the blog
+  // is empty, and nothing in the output says why. So this gate runs both builds with no
+  // core running and requires a non-zero exit carrying a message that names the fix.
+  const siteProject = join(root, 'sites')
+  const siteCreated = hamolus(root, [
+    'create', 'blogco', '--link', REPO, '-o', siteProject, '-y', '--core', 'predefined',
+  ])
+  ok('create succeeds for the site project', siteCreated.status === 0, `${siteCreated.stdout}\n${siteCreated.stderr}`)
+
+  const siteAdded = hamolus(siteProject, ['add', 'site', 'astro_blog', '--template', 'astro'])
+  ok('add site (astro) succeeds', siteAdded.status === 0, `${siteAdded.stdout}\n${siteAdded.stderr}`)
+
+  const nextAdded = hamolus(siteProject, ['add', 'site', 'next_blog', '--template', 'nextjs'])
+  ok('add site (nextjs) succeeds', nextAdded.status === 0, `${nextAdded.stdout}\n${nextAdded.stderr}`)
+
+  if (siteCreated.status === 0 && siteAdded.status === 0 && nextAdded.status === 0) {
+    const siteManifest = JSON.parse(readFileSync(join(siteProject, 'hamolus.json'), 'utf8'))
+    const siteKinds = (siteManifest.parts ?? []).filter((part) => part.kind === 'site')
+    ok('both sites are recorded in hamolus.json', siteKinds.length === 2, JSON.stringify(siteKinds))
+
+    const workspace = readFileSync(join(siteProject, 'pnpm-workspace.yaml'), 'utf8')
+    ok(
+      'the sites glob is inside the packages block',
+      /^\s*-\s*'?sites\/\*'?\s*$/m.test(workspace) && !/packages:[\s\S]*\n\S[\s\S]*sites\/\*/.test(workspace),
+      workspace,
+    )
+
+    for (const id of ['astro_blog', 'next_blog']) {
+      const dir = join(siteProject, 'sites', id)
+      const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+      ok(
+        `the ${id} site is named after the project scope`,
+        manifest.name === `@blogco/site-${id}`,
+        manifest.name,
+      )
+      // A site must not acquire a Hamolus runtime dependency: the whole point of the
+      // hand-written client is that a public bundle carries no admin SDK.
+      ok(
+        `the ${id} site depends on no @hamolus/* runtime`,
+        !Object.keys(manifest.dependencies ?? {}).some((name) => name.startsWith('@hamolus/')),
+        JSON.stringify(manifest.dependencies),
+      )
+      ok(
+        `the ${id} site's origin is not a template token`,
+        !/\{\{[A-Z0-9_]+\}\}/.test(readFileSync(join(dir, 'src', 'lib', 'hamolus.ts'), 'utf8')),
+      )
+    }
+
+    const siteInstalled = pnpm(siteProject, ['install'])
+    ok(
+      'pnpm install succeeds (two sites)',
+      siteInstalled.status === 0,
+      `${siteInstalled.stdout}\n${siteInstalled.stderr}`,
+    )
+
+    const astroChecked = pnpm(siteProject, ['-F', './sites/astro_blog', 'check'])
+    ok(
+      'the astro site typechecks',
+      astroChecked.status === 0,
+      `${astroChecked.stdout}\n${astroChecked.stderr}`,
+    )
+
+    const nextTypechecked = pnpm(siteProject, ['-F', './sites/next_blog', 'typecheck'])
+    ok(
+      'the next site typechecks',
+      nextTypechecked.status === 0,
+      `${nextTypechecked.stdout}\n${nextTypechecked.stderr}`,
+    )
+
+    for (const [id, message, envVar] of [
+      ['astro_blog', 'Could not read the article list', 'PUBLIC_HAMOLUS_ORIGIN'],
+      ['next_blog', 'Could not read the article list', 'HAMOLUS_API_ORIGIN'],
+    ]) {
+      const built = pnpm(siteProject, ['-F', `./sites/${id}`, 'build'])
+      const output = `${built.stdout}\n${built.stderr}`
+      ok(
+        `${id} refuses to build with no core running`,
+        built.status !== 0,
+        'the build succeeded with an unreachable core — that deploys an empty site',
+      )
+      ok(
+        `${id} names the cause and the fix`,
+        output.includes(message) && output.includes(envVar),
+        output.slice(-1200),
+      )
+    }
+  }
 } finally {
   rmSync(root, { recursive: true, force: true })
 }

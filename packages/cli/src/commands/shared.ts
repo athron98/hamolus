@@ -32,7 +32,17 @@ import {
 import { copySource, copyTemplate, formatLabel, type ResolvedTemplate } from '../templates.js'
 import { dim, info, next, step, success, warn } from '../util/log.js'
 
-export const PROJECT_NAME_PATTERN = /^[a-z][a-z0-9_]{0,63}$/
+/**
+ * A part name, as `hamolus add <target> <name>` takes it.
+ *
+ * Named for what it accepts rather than what it resembles on purpose: a *project* name is
+ * looser (`create` allows hyphens and caps it at 63), so a constant called
+ * `PROJECT_NAME_PATTERN` sitting next to the wizard's own hyphen-allowing copy of the
+ * project pattern is an easy way to validate the wrong one. Part ids end up in package
+ * names, npm filters and directory names, which is why they are `snake_case` and capped
+ * at 64.
+ */
+export const PART_NAME_PATTERN = /^[a-z][a-z0-9_]{0,63}$/
 
 export interface AddContext {
   project: Project
@@ -69,7 +79,7 @@ export async function openContext(args: ParsedArgs): Promise<AddContext> {
 export function requirePartName(args: ParsedArgs, what: string): string {
   const name = args.positionals[1]
   if (!name) throw new Error(`Missing ${what} name. Usage: hamolus add ${args.positionals[0]} <name>`)
-  if (!PROJECT_NAME_PATTERN.test(name)) {
+  if (!PART_NAME_PATTERN.test(name)) {
     throw new Error(
       `Invalid ${what} name "${name}". Use snake_case: lowercase letters, digits and ` +
         'underscores, starting with a letter.',

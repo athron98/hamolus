@@ -11,8 +11,14 @@
  *
  * A project is deliberately thin: it contains a **core** (the API Worker) plus the
  * workspace scaffolding needed to build and deploy it. Consoles, panels, MCP
- * servers, plugins and seeds are added afterwards with `hamolus add`, so a project
- * only pays for the parts it actually uses.
+ * servers, sites, plugins and seeds are added afterwards with `hamolus add`, so a
+ * project only pays for the parts it actually uses — except when `hamolus init` asks
+ * for them up front, which is the same thing with the questions asked first.
+ *
+ * The command is deliberately non-interactive: every question it needs has a flag, so
+ * the wizard in `init.ts` is a caller of this one rather than a second implementation
+ * of it. That is what keeps `hamolus create acme --mode bridge` and a generated
+ * wizard run byte-identical.
  */
 
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -20,6 +26,7 @@ import { join, resolve } from 'node:path'
 import type { ParsedArgs } from '../args.js'
 import type { CoreMode } from '../help.js'
 import { linkManifestFile, resolveLinkRoot } from '../link.js'
+import { generateSecret } from '../prompt.js'
 import { PROJECT_FILE, PROJECT_FILE_VERSION, now, writeProject, type Project } from '../project.js'
 import { copyTemplate, formatLabel, resolveTemplateDirectory, type ResolvedTemplate } from '../templates.js'
 import { BASE_COMPILER_OPTIONS } from '../tsconfig.js'
@@ -44,6 +51,54 @@ export const BASIC_TEMPLATE = 'basic'
  */
 const CORE_TEMPLATE_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
 
+/**
+ * The core's own name: an npm package name and a Cloudflare Worker name.
+ *
+ * Underscores are allowed here (a package name may hold one) but the Worker name is
+ * derived from the kebab-case slug, because Worker names only take lowercase letters,
+ * digits and hyphens. `my_core` is therefore a valid package name and an invalid
+ * Worker name, and the same string has to serve both.
+ */
+const CORE_NAME_PATTERN = /^[a-z][a-z0-9._-]{0,62}$/
+
+/**
+ * A secret long enough to be worth writing down.
+ *
+ * 16 characters is the floor, not a recommendation: `JWT_SECRET` signs sessions and
+ * `ADMIN_KEY` is a bearer credential, and a generated project is where those two are
+ * most often left at `change-me`. Failing here costs one flag; a weak default costs a
+ * rotation later, from memory, on a machine that is not this one.
+ */
+const MIN_SECRET_LENGTH = 16
+
+/**
+ * The address a dev server binds to.
+ *
+ * Checked for shape only: a hostname, an IPv4 address, an IPv6 address, or the
+ * `0.0.0.0` / `::` wildcards. The value goes straight into a `wrangler dev --ip` and a
+ * `vite --host` flag, so anything with a space or a quote in it is rejected here
+ * rather than becoming a script that does not parse.
+ */
+const HOST_PATTERN = /^[A-Za-z0-9.:_-]{1,253}$/
+
+/**
+ * A land or colony name, mirroring `scopeNameSchema` in `@hamolus/types`.
+ *
+ * The core owns that schema and this one only exists so the CLI can say *why* an
+ * answer was rejected before it writes a `wrangler.jsonc` the Worker will refuse to
+ * start with. `root` and `default` are the two reserved names: they are how the core
+ * spells "unnamed", and a land that claims to be the root is a land that cannot be
+ * told apart from it.
+ */
+const SCOPE_NAME_PATTERN = /^[a-z][a-z0-9_]{1,39}$/
+const RESERVED_SCOPE_NAMES = new Set(['root', 'default'])
+
+/** What an unset `--land` / `--colony` renders as: the core's unnamed scope. */
+export const DEFAULT_SCOPE_NAME = 'default'
+
+/** What an unset `--host` renders as — Wrangler's own default, spelled out. */
+export const DEFAULT_DEV_HOST = '127.0.0.1'
+
 export interface CreateOptions {
   name: string
   mode: CoreMode
@@ -51,10 +106,63 @@ export interface CreateOptions {
   /** Named core template, from `--core`. Defaults to the mode's template, then `basic`. */
   core?: string
   template?: string
+  /** Name of the core itself — its package name and its Worker name. */
+  coreName: string
+  /** Interface the generated dev servers bind to. */
+  host: string
+  /** Land the bare requests of a multi-tenant core resolve to. */
+  land: string
+  /** Colony the bare requests of a multi-tenant core resolve to. */
+  colony: string
+  /** `JWT_SECRET` for local development; omitted means "do not write .dev.vars". */
+  jwt?: string
+  /** `ADMIN_KEY` for local development. */
+  key?: string
   /** Hamolus checkout to `@hamolus/*` link into, from `--link`. */
   link?: string
   force: boolean
   dryRun: boolean
+}
+
+/** Reject an answer the generated `wrangler.jsonc` or package manifest could not carry. */
+function assertCoreName(name: string): void {
+  if (CORE_NAME_PATTERN.test(name)) return
+  throw new Error(
+    `Invalid core name "${name}". Use lowercase letters, digits, dots, dashes or underscores, ` +
+      'starting with a letter.',
+  )
+}
+
+function assertSecret(label: string, value: string | undefined): void {
+  if (value === undefined) return
+  if (value.length >= MIN_SECRET_LENGTH) return
+  throw new Error(
+    `Invalid ${label} "${value}": a secret needs at least ${MIN_SECRET_LENGTH} characters. ` +
+      'Pass a longer one, or omit the flag — the wizard generates a random value instead.',
+  )
+}
+
+function assertHost(host: string): void {
+  if (HOST_PATTERN.test(host)) return
+  throw new Error(
+    `Invalid --host "${host}". Use 0.0.0.0 to expose a dev server on the LAN, 127.0.0.1 to ` +
+      'keep it local, or type an address or hostname such as mac.lan.',
+  )
+}
+
+function assertScopeName(label: string, value: string): void {
+  if (value === DEFAULT_SCOPE_NAME) return
+  if (SCOPE_NAME_PATTERN.test(value) && !value.includes('__')) return
+  if (RESERVED_SCOPE_NAMES.has(value)) {
+    throw new Error(
+      `Invalid ${label} "${value}": that name is reserved for the unnamed scope the core ` +
+        `falls back to. Pick another one, or omit the flag to use "${DEFAULT_SCOPE_NAME}".`,
+    )
+  }
+  throw new Error(
+    `Invalid ${label} "${value}". Use 2-40 lowercase letters, digits or underscores, starting ` +
+      'with a letter, and no double underscore.',
+  )
 }
 
 export function parseCreateOptions(args: ParsedArgs): CreateOptions {
@@ -80,6 +188,20 @@ export function parseCreateOptions(args: ParsedArgs): CreateOptions {
         'starting with a letter). For a template outside templates/cores, pass --template <path>.',
     )
   }
+  const coreName = args.options.coreName ?? `${name}-core`
+  assertCoreName(coreName)
+
+  const host = args.options.host ?? DEFAULT_DEV_HOST
+  assertHost(host)
+
+  const land = args.options.land ?? DEFAULT_SCOPE_NAME
+  const colony = args.options.colony ?? DEFAULT_SCOPE_NAME
+  assertScopeName('--land', land)
+  assertScopeName('--colony', colony)
+
+  assertSecret('--jwt', args.options.jwt)
+  assertSecret('--key', args.options.key)
+
   const output = args.options.output
     ? resolve(process.cwd(), args.options.output)
     : resolve(process.cwd(), name)
@@ -89,6 +211,12 @@ export function parseCreateOptions(args: ParsedArgs): CreateOptions {
     output,
     core: args.options.core,
     template: args.options.template,
+    coreName,
+    host,
+    land,
+    colony,
+    jwt: args.options.jwt,
+    key: args.options.key,
     link: args.options.link,
     force: args.flags.force,
     dryRun: args.flags.dryRun,
@@ -105,15 +233,27 @@ function projectTokens(options: CreateOptions): Record<string, string> {
   // kebab-case slug — never from a snake_case project name, which would produce an
   // invalid `bucket_name` and fail `wrangler deploy`.
   const slug = options.name.replace(/_/g, '-')
+  const coreSlug = options.coreName.replace(/_/g, '-')
   return {
     PROJECT_NAME: options.name,
     PROJECT_LABEL: formatLabel(options.name),
     PROJECT_SCOPE: scopeFor(options.name),
     PROJECT_SLUG: slug,
+    // The core is a package and a Worker in its own right, so it is named separately
+    // from the project: one workspace cannot hold two packages called `acme-core`.
+    CORE_NAME: options.coreName,
+    CORE_SLUG: coreSlug,
+    CORE_LABEL: formatLabel(options.coreName),
     CORE_MODE: options.mode,
     // A multi-tenant core must not hand out unauthenticated reads, so PUBLIC_GETS is
     // mode-aware in both `wrangler.jsonc` (what deploys use) and `.env.example`.
     PUBLIC_GETS: options.mode === 'independent' ? 'true' : 'false',
+    // The address `pnpm dev` binds to. Written into the dev script rather than left
+    // implicit, so "why can my phone not open this" is answered by the file rather
+    // than by remembering which flag the project was created with.
+    DEV_HOST: options.host,
+    DEFAULT_LAND: options.land,
+    DEFAULT_COLONY: options.colony,
     DB_NAME: `${slug}-db`,
     BUCKET_NAME: `${slug}-media`,
     KV_NAMESPACE: `${slug}-settings`,
@@ -128,31 +268,42 @@ const WORKSPACE_GLOBS = [
   'panels/*',
   'mcp',
   'seeds/*',
+  'sites/*',
 ].join('\n')
+
+/**
+ * Transitive dependencies whose install scripts this project trusts.
+ *
+ * pnpm 10+ refuses to run an install script until the package is approved, and both
+ * Wrangler's toolchain and Astro's image pipeline need one. Without approval every
+ * `pnpm -F ./core typecheck` in a fresh clone fails with ERR_PNPM_IGNORED_BUILDS, so a
+ * generated project has to ship the approval.
+ *
+ * Declared once and written into **both** settings pnpm reads. That redundancy is not
+ * caution, it is what the two settings are for — `onlyBuiltDependencies` is the list form
+ * and `allowBuilds` the map form, and pnpm 11 treats the map as authoritative. A project
+ * that listed `sharp` in one and not the other installed fine until a site was added,
+ * because nothing but Astro pulls `sharp` in: an approval gap that is invisible until the
+ * part which needs it exists.
+ */
+const TRUSTED_BUILD_SCRIPTS = ['esbuild', 'workerd', 'sharp', 'unrs-resolver', 'core-js-pure']
 
 function workspaceManifest(): string {
   const globs = WORKSPACE_GLOBS.split('\n')
     .map((glob) => `  - '${glob}'`)
     .join('\n')
+  const allowed = TRUSTED_BUILD_SCRIPTS.map((name) => `  - ${name}`).join('\n')
+  const approved = TRUSTED_BUILD_SCRIPTS.map((name) => `  ${name}: true`).join('\n')
 
-  // pnpm 10+ refuses to run a script when a dependency has an unapproved build
-  // script, and Wrangler's own toolchain needs esbuild/workerd to build. Without
-  // these entries every `pnpm -F ./core typecheck` in a fresh clone fails with
-  // ERR_PNPM_IGNORED_BUILDS, so a generated project has to ship them.
   return `packages:
 ${globs}
 
 # Build scripts of transitive dependencies, trusted for this project.
 onlyBuiltDependencies:
-  - esbuild
-  - workerd
-  - sharp
-  - unrs-resolver
+${allowed}
 
 allowBuilds:
-  core-js-pure: true
-  esbuild: true
-  workerd: true
+${approved}
 `
 }
 
@@ -215,6 +366,9 @@ function envExample(options: CreateOptions): string {
     '# Shared secrets for this Hamolus project.',
     '# Put real values in core/.dev.vars (git-ignored) or as Wrangler secrets.',
     '# Wrangler only reads the .dev.vars next to core/wrangler.jsonc.',
+    options.jwt || options.key
+      ? '# core/.dev.vars was generated with working values — `pnpm dev` needs nothing else.'
+      : '# Copy this file to core/.dev.vars and fill it in, or let `hamolus init` generate it.',
     '',
     '# Signing secret for console + panel sessions.',
     'JWT_SECRET=change-me',
@@ -229,10 +383,44 @@ function envExample(options: CreateOptions): string {
     '# Set to "true" to allow unauthenticated GET requests.',
     `PUBLIC_GETS=${options.mode === 'independent' ? 'true' : 'false'}`,
     '',
-    '# Land / colony routing.',
+    '# Land / colony routing. A bare name is enough — the core appends the _lnd / _cny',
+    '# suffix itself, and "default" is the unnamed (root) scope.',
     `CORE_MODE=${options.mode}`,
-    'DEFAULT_LAND=default',
-    'COLONY=',
+    `DEFAULT_LAND=${options.land}`,
+    `DEFAULT_COLONY=${options.colony}`,
+    '',
+    '# The interface pnpm dev binds to. 0.0.0.0 exposes the core on the LAN.',
+    `DEV_HOST=${options.host}`,
+    '',
+  ].join('\n')
+}
+
+/**
+ * `core/.dev.vars` — the local-only secret file Wrangler reads automatically.
+ *
+ * It has to sit next to `core/wrangler.jsonc`: Wrangler resolves `.dev.vars` relative
+ * to the config file, so the same file in the project root is silently ignored and the
+ * Worker then starts with no `ADMIN_KEY` (`POST /api/_auth/token` answers
+ * `INVALID_KEY`). A generated project that ships a working `pnpm dev` has to write it
+ * there, and the file is git-ignored, so the values never reach a commit.
+ *
+ * A missing half is generated rather than left as `change-me`: the two secrets are
+ * always needed together, and half a working pair is a confusing way to start.
+ */
+function devVars(options: CreateOptions): string {
+  const jwt = options.jwt ?? generateSecret()
+  const key = options.key ?? generateSecret()
+  return [
+    `# Local development secrets for the ${formatLabel(options.name)} core.`,
+    '#',
+    '# Generated by `hamolus create`. This file is git-ignored — the real values belong',
+    '# in `wrangler secret put` for anything you deploy.',
+    '',
+    '# Signing secret for console + panel sessions.',
+    `JWT_SECRET=${jwt}`,
+    '',
+    '# Admin login key: the console login, the CLI and every seed script use it.',
+    `ADMIN_KEY=${key}`,
     '',
   ].join('\n')
 }
@@ -258,6 +446,11 @@ A [Hamolus](https://github.com/hamolus-labs/hamolus) project created with
       ? 'ships a collection and a panel defined in `core/src/` (edit those files, not the API)'
       : 'no collections or panels yet — create them in the console or the API'
   }
+- **Dev interface**: \`${options.host}\` — ${
+    options.host === DEFAULT_DEV_HOST
+      ? 'local only'
+      : `reachable from other devices on the network as http://${options.host}:8787`
+  }
 
 ## Layout
 
@@ -266,6 +459,7 @@ core/       the API Worker — dynamic CRUD on D1, KV settings, R2 libraries
 console/    (optional) admin console        \`hamolus add console\`
 panels/     (optional) generated panel apps \`hamolus add panel <name>\`
 mcp/        (optional) MCP server            \`hamolus add mcp\`
+sites/      (optional) Astro / Next.js sites \`hamolus add site <name>\`
 seeds/      (optional) seed scripts         \`hamolus add seed <name>\`
 \`\`\`
 
@@ -280,11 +474,29 @@ pnpm build
 
 ## Secrets
 
-Copy \`.env.example\` to \`core/.dev.vars\` and fill it in. Never commit real secrets.
+${
+  options.jwt || options.key
+    ? '`core/.dev.vars` was generated with a random `JWT_SECRET` and `ADMIN_KEY`, so ' +
+      '`pnpm dev` and the console login work as they are. The file is git-ignored. Never ' +
+      'commit it, and rotate both values before deploying anything.'
+    : 'Copy `.env.example` to `core/.dev.vars` and fill it in, or run ' +
+      '`hamolus init --yes` to have a working pair generated. Never commit real secrets.'
+}
 Wrangler reads \`.dev.vars\` from the directory holding \`wrangler.jsonc\`, so it has to be
 the one in \`core/\` — a copy in the project root is ignored and the core then starts
 without an \`ADMIN_KEY\`.
+${
+  options.mode === 'independent'
+    ? ''
+    : `
+## Scope
+
+Bare (unprefixed) requests resolve to land \`${options.land}\` and colony
+\`${options.colony}\`. Both live in \`core/wrangler.jsonc\` as \`DEFAULT_LAND\` and
+\`DEFAULT_COLONY\`, and \`hamolus add configuration <land>\` adds a deployment preset
+per land.
 `
+}`
 
 export async function runCreate(args: ParsedArgs): Promise<void> {
   const options = parseCreateOptions(args)
@@ -297,8 +509,9 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
   if (options.dryRun) {
     info(`Dry run — nothing written. Planned output in ${options.output}:`)
     step(`${dim('template')} ${template.origin}: ${template.directory}`)
-    step(`${dim('core')}    ${relativeCore}/`)
+    step(`${dim('core')}    ${relativeCore}/  (${options.coreName}, ${options.mode})`)
     step(`${dim('root')}    package.json, pnpm-workspace.yaml, ${PROJECT_FILE}, .gitignore, .env.example, README.md`)
+    if (options.jwt || options.key) step(`${dim('secrets')}  core/.dev.vars`)
     if (link) step(`${dim('link')}     @hamolus/* → ${link.packages}`)
     return
   }
@@ -308,6 +521,13 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
   const copied = await copyTemplate(template.directory, join(options.output, relativeCore), tokens, {
     force: options.force,
   })
+
+  // Written after the core, because it belongs next to the core's `wrangler.jsonc` and
+  // has to be replaced rather than merged when `--force` regenerates over it.
+  const withSecrets = Boolean(options.jwt || options.key)
+  if (withSecrets) {
+    await writeFile(join(options.output, relativeCore, '.dev.vars'), devVars(options), 'utf8')
+  }
 
   const linked = link
     ? await linkManifestFile(join(options.output, relativeCore, 'package.json'), link)
@@ -323,6 +543,10 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
     // Recorded so `hamolus add console|mcp|panel` links the same checkout instead of
     // silently going back to the registry half-way through scaffolding a project.
     ...(link ? { link: link.root } : {}),
+    // A part added later inherits the answers `create` already settled, so a project
+    // created to be reachable over the LAN does not lose that on its second part.
+    devHost: options.host,
+    ...(options.mode === 'independent' ? {} : { land: options.land, colony: options.colony }),
     parts: [
       {
         kind: 'core',
@@ -361,6 +585,11 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
 
   success(`Created ${formatLabel(options.name)} (${options.mode}) in ${options.output}`)
   info(`core: ${copied.files} files from ${template.origin}`)
+  step(`${dim('dev')}     ${options.host === DEFAULT_DEV_HOST ? 'localhost only' : options.host}`)
+
+  if (withSecrets) {
+    info(`secrets: core/.dev.vars (JWT_SECRET + ADMIN_KEY generated, git-ignored)`)
+  }
 
   if (link) {
     info(`link: ${linked.length} @hamolus/* deps → ${link.packages}`)
@@ -369,8 +598,9 @@ export async function runCreate(args: ParsedArgs): Promise<void> {
 
   if (options.mode !== 'independent') {
     warn(
-      `Mode "${options.mode}" needs land/colony setup before it is useful — ` +
-        'see core/README.md and `hamolus add configuration <land>`.',
+      `Mode "${options.mode}" resolves bare requests to land "${options.land}" / colony ` +
+        `"${options.colony}". Change it in core/wrangler.jsonc, or add a preset with ` +
+        '`hamolus add configuration <land>`.',
     )
   }
 

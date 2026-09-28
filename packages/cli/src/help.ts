@@ -16,7 +16,7 @@
  */
 
 export const CLI_NAME = 'hamolus'
-export const CLI_VERSION = '0.2.1'
+export const CLI_VERSION = '0.2.2'
 
 export const CORE_MODES = ['independent', 'centralized', 'proxy', 'bridge'] as const
 export type CoreMode = (typeof CORE_MODES)[number]
@@ -25,11 +25,15 @@ export function usage(): string {
   return [
     `${CLI_NAME} — scaffold Hamolus projects, consoles, panels and MCP servers.`,
     '',
+    `Equivalent to: npm create hamolus@latest`,
+    '',
     'Usage:',
+    `  ${CLI_NAME} init [name] [options]       Guided setup — asks, then creates the project`,
     `  ${CLI_NAME} create <name> [options]      Create a new Hamolus project (with a core)`,
     `  ${CLI_NAME} add console [options]        Add a console to the current project`,
     `  ${CLI_NAME} add panel <name> [options]   Add a panel app to the current project`,
     `  ${CLI_NAME} add mcp [options]            Add an MCP server to the current project`,
+    `  ${CLI_NAME} add site <name> [options]    Add a public site (Astro or Next.js)`,
     `  ${CLI_NAME} add plugin <name> [options]  Add a console plugin to the current project`,
     `  ${CLI_NAME} add seed <name> [options]    Add a seed script to the current project`,
     `  ${CLI_NAME} add configuration <name>     Add a wrangler/KV configuration preset`,
@@ -40,8 +44,14 @@ export function usage(): string {
     '',
     'Common options:',
     '  -o, --output <path>     Write to an explicit path instead of the project default',
-    '      --mode <mode>      Core mode for `create`: independent | centralized | proxy | bridge',
-    '      --core <name>      Core template for `create`: basic (no schema) | predefined',
+    '      --mode <mode>      Core mode: independent | centralized | proxy | bridge',
+    '      --core <name>      Core template: basic (no schema) | predefined',
+    '      --core-name <name> Name of the core itself — its package and Worker name',
+    '      --host <address>   Interface the dev servers bind to (default 127.0.0.1)',
+    '      --jwt <secret>     JWT_SECRET for local dev; omit and one is generated',
+    '      --key <secret>     ADMIN_KEY for local dev; omit and one is generated',
+    '      --land <name>      Land bare requests resolve to (multi-tenant modes)',
+    '      --colony <name>    Colony bare requests resolve to (multi-tenant modes)',
     '      --template <path>  Use an explicit template directory (skips resolution)',
     '      --source <path>    Use an explicit source directory (skips package resolution)',
     '      --package <name>   Use a specific published package version as the source',
@@ -53,19 +63,23 @@ export function usage(): string {
     '  -h, --help             Show this help',
     '',
     'Examples:',
+    `  ${CLI_NAME} init                            # the wizard — same as npm create hamolus@latest`,
+    `  ${CLI_NAME} init acme --mode centralized --land acme --mcp`,
     `  ${CLI_NAME} create acme`,
     `  ${CLI_NAME} create acme --mode centralized`,
     `  ${CLI_NAME} create acme --core predefined   # a collection + panel in source control`,
     `  ${CLI_NAME} add console`,
     `  ${CLI_NAME} add panel shop_ops`,
     `  ${CLI_NAME} add mcp`,
+    `  ${CLI_NAME} add site blog`,
     `  ${CLI_NAME} add plugin todo`,
     `  ${CLI_NAME} create acme --link ../hamolus   develop against a local checkout`,
   ].join('\n')
 }
 
-export function commandHelp(command: 'create' | 'add' | 'link'): string {
+export function commandHelp(command: 'init' | 'create' | 'add' | 'link'): string {
   if (command === 'link') return linkHelp()
+  if (command === 'init') return initHelp()
   if (command === 'create') {
   return [
       `Usage: ${CLI_NAME} create <name> [options]`,
@@ -85,6 +99,15 @@ export function commandHelp(command: 'create' | 'add' | 'link'): string {
       '      --core <name>      Core template (default: the mode\'s, then basic)',
       '                          basic     no collections or panels',
       '                          predefined a posts collection + content panel in src/',
+      '      --core-name <name> Core package and Worker name (default: <name>-core)',
+      '      --host <address>   Interface `pnpm dev` binds to (default: 127.0.0.1)',
+      '                          Use 0.0.0.0 to open a dev server on the LAN',
+      '      --jwt <secret>     JWT_SECRET written to core/.dev.vars (16+ characters)',
+      '      --key <secret>     ADMIN_KEY written to core/.dev.vars (16+ characters)',
+      '                          Passing either one writes a working pair; passing',
+      '                          neither writes no .dev.vars at all.',
+      '      --land <name>      Land bare requests resolve to (default: default)',
+      '      --colony <name>    Colony bare requests resolve to (default: default)',
       '  -o, --output <path>     Output directory (default: ./<name>)',
       '      --link <path>      Link @hamolus/* into a local checkout (skips the registry)',
       '      --force            Overwrite an existing directory',
@@ -100,6 +123,7 @@ export function commandHelp(command: 'create' | 'add' | 'link'): string {
     '  console        A SolidJS admin console (collections, records, media, panels)',
     '  panel <name>   A generated SolidJS panel app driven by a core panel manifest',
     '  mcp            A Model Context Protocol server exposing the core API',
+    '  site <name>    A public site reading the core over REST (astro | nextjs)',
     '  plugin <name>  A console plugin (todo, kanban) wired into an existing console',
     '  seed <name>    A self-cleaning seed script for the core',
     '  configuration  A wrangler + KV configuration preset',
@@ -114,6 +138,63 @@ export function commandHelp(command: 'create' | 'add' | 'link'): string {
     '      --dry-run          Print the plan without writing anything',
     '  -y, --yes               Assume "yes" for every prompt',
     '  -h, --help              Show this help',
+  ].join('\n')
+}
+
+/**
+ * `hamolus init` — the guided path, and what `npm create hamolus@latest` runs.
+ *
+ * The questions are documented as a list because that is the only part of the CLI a
+ * newcomer cannot infer from a flag. The guarantee worth stating is the other half: a
+ * question whose flag is already on the command line is not asked, so this is a set of
+ * defaults rather than a form.
+ */
+function initHelp(): string {
+  return [
+    `Usage: ${CLI_NAME} init [name] [options]`,
+    '',
+    'Asks ten questions and then creates the project, its core and any parts you',
+    'asked for. Every question has a flag, and a question whose flag is present is',
+    'not asked — so this is a scriptable set of defaults, not a form to fill in.',
+    '',
+    'With no terminal, or with --yes, every question takes its default and says so.',
+    '',
+    'The questions:',
+    '  1. Project name — the directory it goes in',
+    '  2. Core name — its package and Worker name',
+    `  3. Core mode — ${CORE_MODES.join(' | ')}`,
+    '     a multi-tenant mode also asks for a land and a colony',
+    '  4. Predefined collections in core/src/? — y, n, or a template name',
+    '  5. JWT secret — typed, or generated when left empty',
+    '  6. Admin key — typed, or generated when left empty',
+    '  7. Expose the dev servers on the LAN? — y = 0.0.0.0, n = 127.0.0.1,',
+    '     or type an address such as mac.lan',
+    '  8. Add an admin console?',
+    '  9. Add an MCP server?',
+    ' 10. Add a public site? — y = astro, n = none, or type a framework or a path',
+    '',
+    'Options:',
+    '      --core-name <name> Skip question 2',
+    '      --mode <mode>      Skip question 3',
+    '      --land <name>      Skip the land question',
+    '      --colony <name>    Skip the colony question',
+    '      --core <name>      Skip question 4',
+    '      --jwt <secret>     Skip question 5',
+    '      --key <secret>     Skip question 6',
+    '      --host <address>   Skip question 7',
+    '      --console          Answer question 8 with yes',
+    '      --mcp              Answer question 9 with yes',
+    '      --site <name>      Answer question 10 with this framework or path',
+    '  -o, --output <path>     Write the project somewhere else',
+    '      --link <path>      Link @hamolus/* into a local checkout',
+    '      --force            Overwrite an existing directory',
+    '  -y, --yes               Ask nothing; take every default',
+    '  -h, --help              Show this help',
+    '',
+    'Examples:',
+    `  ${CLI_NAME} init`,
+    `  ${CLI_NAME} init acme --mode centralized --land acme --mcp --console`,
+    `  ${CLI_NAME} init acme --yes --host 0.0.0.0 --site nextjs`,
   ].join('\n')
 }
 

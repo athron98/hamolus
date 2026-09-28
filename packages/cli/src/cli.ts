@@ -12,6 +12,11 @@
  * Commands are intentionally thin: they validate input, do the work, and print a
  * short report. Anything reusable lives in a sibling module so a new `add` target
  * is a small file rather than a new code path through this one.
+ *
+ * `create` with no name is the one exception, and it is a courtesy rather than a
+ * second entry point: a bare `hamolus create` cannot mean anything without a name, so
+ * it opens the wizard instead of printing a usage error. `init` is the real command
+ * and the one `npm create hamolus@latest` runs.
  */
 
 import { parse } from './args.js'
@@ -22,9 +27,12 @@ import { runAddMcp } from './commands/add-mcp.js'
 import { runAddPanel } from './commands/add-panel.js'
 import { runAddPlugin } from './commands/add-plugin.js'
 import { runAddSeed } from './commands/add-seed.js'
+import { runAddSite } from './commands/add-site.js'
 import { runCreate } from './commands/create.js'
+import { runInit } from './commands/init.js'
 import { runLink } from './commands/link.js'
 import { runList } from './commands/list.js'
+import { canPrompt } from './prompt.js'
 import { failure } from './util/log.js'
 
 const ADD_TARGETS = [
@@ -34,6 +42,7 @@ const ADD_TARGETS = [
   'plugin',
   'seed',
   'configuration',
+  'site',
 ] as const
 
 type AddTarget = (typeof ADD_TARGETS)[number]
@@ -58,6 +67,7 @@ export async function run(argv: string[]): Promise<number> {
   // `--help` anywhere short-circuits the command.
   if (argv.includes('--help') || argv.includes('-h')) {
     if (command === 'create') console.log(commandHelp('create'))
+    else if (command === 'init') console.log(commandHelp('init'))
     else if (command === 'add') console.log(commandHelp('add'))
     else if (command === 'link') console.log(commandHelp('link'))
     else console.log(usage())
@@ -77,7 +87,19 @@ export async function run(argv: string[]): Promise<number> {
 
   try {
     switch (command) {
+      case 'init':
+        await runInit(args)
+        return 0
       case 'create':
+        // A bare `hamolus create` has no name and cannot invent one; the wizard can.
+        // So the wizard answers instead — including under `--yes`, which is a request
+        // for defaults and needs no terminal to supply them. Only a nameless, prompt-
+        // less, non-`-y` run is a genuine usage error: there is nothing to answer with
+        // and nothing to default from.
+        if (args.positionals.length === 0 && (canPrompt(false) || args.flags.yes)) {
+          await runInit(args)
+          return 0
+        }
         await runCreate(args)
         return 0
       case 'list':
@@ -103,6 +125,9 @@ export async function run(argv: string[]): Promise<number> {
             return 0
           case 'mcp':
             await runAddMcp(args)
+            return 0
+          case 'site':
+            await runAddSite(args)
             return 0
           case 'plugin':
             await runAddPlugin(args)

@@ -110,6 +110,12 @@ importers:
         specifier: ^4.135.0
         version: 4.140.0(@cloudflare/workers-types@5.20260925.1)(@types/node@24.13.6)
 
+  packages/create-hamolus:
+    dependencies:
+      '@hamolus/cli':
+        specifier: workspace:*
+        version: link:../cli
+
   packages/mcp:
     dependencies:
       '@hamolus/types':

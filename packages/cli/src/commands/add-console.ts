@@ -23,6 +23,7 @@
 import { join, relative } from 'node:path'
 import type { ParsedArgs } from '../args.js'
 import { formatLabel, resolveTemplateDirectory } from '../templates.js'
+import { DEFAULT_DEV_HOST } from './create.js'
 import {
   addFromTemplate,
   assertTemplateNotSource,
@@ -36,9 +37,17 @@ import {
 
 const BASIC_TEMPLATE = 'basic'
 
-/** Template tokens understood by the console template. */
+/**
+ * Template tokens understood by the console template.
+ *
+ * `DEV_HOST` is the address `pnpm dev` binds to, taken from the project rather than
+ * hard-coded: a core created to be reachable over the LAN (`hamolus create --host
+ * 0.0.0.0`, or the wizard's question) would otherwise come with a console that only
+ * opens on the machine it runs on. A project generated before the project file
+ * recorded it has no key, and Wrangler's own default is the right fallback.
+ */
 export function consoleTokens(
-  project: { name: string; scope: string },
+  project: { name: string; scope: string; devHost?: string },
 ): Record<string, string> {
   return {
     PROJECT_NAME: project.name,
@@ -46,6 +55,7 @@ export function consoleTokens(
     PROJECT_SCOPE: project.scope,
     PROJECT_SLUG: project.name.replace(/_/g, '-'),
     PACKAGE_NAME: `${project.scope}/console`,
+    DEV_HOST: project.devHost ?? DEFAULT_DEV_HOST,
   }
 }
 

@@ -4,7 +4,7 @@
   // `main` points at the local seam in src/index.ts, which re-exports the app from
   // @hamolus/core. Edit that file to wrap the app; you never need to fork the package.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "{{PROJECT_SLUG}}-core",
+  "name": "{{CORE_SLUG}}",
   "main": "src/index.ts",
   "compatibility_date": "2025-12-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -44,8 +44,11 @@
     // Multi-tenant mode: independent | centralized | proxy | bridge
     "CORE_MODE": "{{CORE_MODE}}",
 
-    // Land used by bare (unprefixed) tenant requests.
-    "DEFAULT_LAND": "default",
+    // Scope used by bare (unprefixed) requests. A bare name is enough — the core
+    // appends the _lnd / _cny suffix itself, and "default" is the unnamed (root) scope.
+    // Only read in a multi-tenant mode; an independent core has no scope layer.
+    "DEFAULT_LAND": "{{DEFAULT_LAND}}",
+    "DEFAULT_COLONY": "{{DEFAULT_COLONY}}",
 
     // Public sites read collections and settings without a token (GET only).
     // Auth-guarded GETs (/api/_auth/*, /api/_meta/universe/*) still require a session.

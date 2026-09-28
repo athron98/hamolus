@@ -46,11 +46,37 @@ export interface ParsedArgs {
      * rather than against a list of known names.
      */
     core?: string
+    /**
+     * Name of the generated core itself — its package name and its Worker name.
+     *
+     * Distinct from `--core`, which names a *template*. One project may want its core
+     * called `acme-api` while still generating from `predefined`.
+     */
+    coreName?: string
     template?: string
     source?: string
     package?: string
     /** Hamolus checkout to link `@hamolus/*` dependencies into. */
     link?: string
+    /** `JWT_SECRET` for the generated project's local development. */
+    jwt?: string
+    /** `ADMIN_KEY` — the key the console, the CLI and the seeds authenticate with. */
+    key?: string
+    /**
+     * Interface the generated dev servers bind to: `0.0.0.0` (or a LAN address, or
+     * `mac.lan`) to reach them from another device, `127.0.0.1` to stay local.
+     */
+    host?: string
+    /** Land the bare, unprefixed requests of a multi-tenant core resolve to. */
+    land?: string
+    /** Colony the bare requests of a multi-tenant core resolve to. */
+    colony?: string
+    /** `init` only: add a console, skipping the question. */
+    console?: boolean
+    /** `init` only: add an MCP server, skipping the question. */
+    mcp?: boolean
+    /** `init` only: add a site from this template (`astro`, `nextjs`, or a path). */
+    site?: string
   }
 }
 
@@ -58,10 +84,19 @@ const OPTIONS = {
   output: { type: 'string', short: 'o' },
   mode: { type: 'string' },
   core: { type: 'string' },
+  'core-name': { type: 'string' },
   template: { type: 'string' },
   source: { type: 'string' },
   package: { type: 'string' },
   link: { type: 'string' },
+  jwt: { type: 'string' },
+  key: { type: 'string' },
+  host: { type: 'string' },
+  land: { type: 'string' },
+  colony: { type: 'string' },
+  console: { type: 'boolean' },
+  mcp: { type: 'boolean' },
+  site: { type: 'string' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   clear: { type: 'boolean' },
@@ -108,10 +143,19 @@ export function parse(argv: string[]): ParsedArgs {
       output: parsed.values.output,
       mode: parsed.values.mode,
       core: parsed.values.core,
+      coreName: parsed.values['core-name'],
       template: parsed.values.template,
       source: parsed.values.source,
       package: parsed.values.package,
       link: parsed.values.link,
+      jwt: parsed.values.jwt,
+      key: parsed.values.key,
+      host: parsed.values.host,
+      land: parsed.values.land,
+      colony: parsed.values.colony,
+      console: parsed.values.console,
+      mcp: parsed.values.mcp,
+      site: parsed.values.site,
     },
   }
 }

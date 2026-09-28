@@ -229,8 +229,13 @@ const manifests = []
 for (const file of walk(join(REPO, 'packages'))) {
   if (extname(file) !== '.json') continue
   const manifest = JSON.parse(readFileSync(file, 'utf8'))
-  if (!manifest.name?.startsWith('@hamolus/')) continue
-  if (manifest.private === true) continue
+  // Scoped by the directory, not by the name. This was a `name.startsWith('@hamolus/')`
+  // test, which quietly skipped the one published package that is not scoped —
+  // `create-hamolus`, the initializer behind `npm create hamolus@latest`. A name-shape
+  // filter is a proxy for "is this ours", and `packages/**` already answers that exactly,
+  // so a package with a slightly different name would have been the one package in the
+  // tree nobody checked.
+  if (!manifest.name || manifest.private === true) continue
   manifests.push({ file, manifest })
 }
 const REQUIRED = ['license', 'author', 'homepage', 'bugs', 'repository']

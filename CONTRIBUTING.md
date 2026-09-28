@@ -55,7 +55,7 @@ section of prose.
 | ---- | ----- | -------------- |
 | `pnpm typecheck` | — | every package typechecks |
 | `pnpm build` | — | every package builds |
-| `pnpm check:markers` | — | the template *copy* is faithful, offline and fast |
+| `pnpm check:markers` | — | the template *copy* is faithful, offline and fast; also that `hamolus init` produces the project its answers describe |
 | `pnpm check:workspace-glob` | — | workspace and glob regressions |
 | `pnpm check:copyright` | — | every published source file carries the copyright/author notice, and every published manifest declares it |
 | `pnpm check:code-definitions` | — | boot-time validation, duplicate detection, guard helpers, and that a failed write leaves the previous definitions standing |
@@ -65,7 +65,7 @@ section of prose.
 | `pnpm check:scope-colony-resolution` | a running core | land/colony scope resolution over HTTP |
 | `pnpm check:localization-api` | a running core | locale negotiation on real endpoints |
 | `pnpm check:code-defined-core` | a generated `predefined` core | code-defined collections and panels serve and stay frozen |
-| `pnpm check:generated-app` | a warm pnpm store + `build:lib` | a generated project installs, typechecks and builds |
+| `pnpm check:generated-app` | a warm pnpm store + `build:lib` | a generated project installs, typechecks and builds — core, console and both site templates |
 
 The last five need a running Worker or a real install. They failing on a laptop
 without that setup is not a regression — say which gates you ran.
@@ -162,12 +162,16 @@ wherever a reader might reasonably expect the `PUT` to do it.
 
 ## Releases
 
-**The six core packages ship together, at the same version number.** `@hamolus/core`,
-`@hamolus/mcp`, `@hamolus/console`, `@hamolus/panel`, `@hamolus/types` and
-`@hamolus/cli` are published in one pass. A generated project depends on several
-of them at once, so a `^0.2.0` console against a `^0.1.0` core is a shape
-mismatch waiting to happen; there is no value in a staggered release that nobody
-can install cleanly.
+**The six `@hamolus/*` packages ship together with `create-hamolus`, at the same
+version number.** `@hamolus/core`, `@hamolus/mcp`, `@hamolus/console`,
+`@hamolus/panel`, `@hamolus/types` and `@hamolus/cli` are published in one pass,
+and the `npm create hamolus@latest` front door goes with them. A generated
+project depends on several of them at once, so a `^0.2.0` console against a
+`^0.1.0` core is a shape mismatch waiting to happen; there is no value in a
+staggered release that nobody can install cleanly. `create-hamolus` is in the
+set for the same reason rather than by name: it depends on `@hamolus/cli` by
+range, so leaving it behind would make `npm create hamolus@latest` hand a
+scaffold to a CLI it was not built against.
 
 **The console plugins under `packages/plugins/**` version independently.** They
 are a separate release train on purpose — a plugin that did not change should not
@@ -196,7 +200,7 @@ pnpm check:package-versions   # lockstep versions, every template/example range,
                               # fallback table, the reported CLI/server versions, the changelog
 ```
 
-Then, in order: bump the six `package.json` versions, bump the ranges in
+Then, in order: bump the seven `package.json` versions, bump the ranges in
 `templates/**`, `packages/cli/templates/**` and `examples/**`, update
 `FALLBACK_RANGES` and `CLI_VERSION` / `SERVER_VERSION`, write the changelog entry,
 `pnpm build && pnpm typecheck && pnpm -s check:package-versions`, publish

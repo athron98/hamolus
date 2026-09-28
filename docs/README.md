@@ -45,14 +45,15 @@ three of them are database rows while one is a file.
 ## Repository layout
 
 ```
-packages/cli         the scaffolder (hamolus create / add / link / list)
+packages/cli         the scaffolder (hamolus init / create / add / link / list)
+packages/create-hamolus  the initializer npm runs for `npm create hamolus@latest`
 packages/core        the API Worker — Hono + Drizzle on D1, KV, R2
 packages/console     SolidJS + StyleX admin app (also the `add console` source)
 packages/types       shared Zod schemas, types and DTOs
 packages/panel       framework-neutral browser client for the Panel API
 packages/mcp         MCP server exposing the core API as tools
 packages/plugins     console plugin workspace (contracts + todo + kanban)
-templates/           canonical CLI templates (cores, panels, seeds, configurations)
+templates/           canonical CLI templates (cores, panels, sites, seeds, configurations)
 docs/                this documentation set
 ```
 
@@ -164,3 +165,15 @@ ids — or let `hamolus add configuration` do it for you.
 | core (`wrangler dev` default) | 8787 |
 | console (explicit in `vite.config.ts`) | 5173 |
 | mcp (`wrangler dev` default) | 8787 — run it on another port, e.g. `--port 8790` |
+| site (astro, explicit in `astro.config.mjs`) | 4321 |
+| site (next, `next dev` default) | 3000 |
+
+Every generated `dev` script binds the host the project was created with, so all of
+them answer on the LAN together or none of them do:
+
+```bash
+hamolus init acme --host 0.0.0.0          # or: hamolus init, then answer yes to the LAN question
+```
+
+A site generated for a LAN project still reads `http://localhost:8787`, because
+`0.0.0.0` is a bind address and not a destination.

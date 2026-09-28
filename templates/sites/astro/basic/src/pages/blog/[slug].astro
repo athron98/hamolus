@@ -1,0 +1,133 @@
+---
+import Base from '../../layouts/Base.astro'
+import { listPublishedArticles } from '../../lib/articles'
+import { getRecord, HamolusApiError } from '../../lib/hamolus'
+import type { Article } from '../../lib/articles'
+
+/**
+ * One article page.
+ *
+ * `getStaticPaths` runs **at build time**, and it is the only place allowed to decide which
+ * routes get built. Only the article list is fetched there; the detail is fetched again
+ * through `getRecord(id)` so the core stays the single source of truth. Fetching the detail
+ * in `getStaticPaths` too would read one page twice and leave two places where the data can
+ * go stale.
+ *
+ * Route note: the URL uses `slug` so it reads well, but the core only knows `id`. The
+ * mapping in `getStaticPaths` bridges the two, through the `props.id` carried over here.
+ */
+
+export async function getStaticPaths() {
+  let ids: { id: string; slug: string }[]
+  try {
+    const { data } = await listPublishedArticles()
+    ids = data.map((article) => ({ id: article.id, slug: article.slug }))
+  } catch (cause) {
+    // A build with no live core has to fail with an actionable message, not produce an
+    // empty output directory with no explanation.
+    throw new Error(
+      'Could not read the article list from the core. Start the core first, or set PUBLIC_HAMOLUS_ORIGIN.',
+      { cause },
+    )
+  }
+
+  return ids.map((entry) => ({
+    params: { slug: entry.slug },
+    props: { id: entry.id },
+  }))
+}
+
+interface Props {
+  id: string
+}
+
+const { id } = Astro.props
+
+let article: Article
+try {
+  article = (await getRecord<Article>('articles', id)).data
+} catch (cause) {
+  if (cause instanceof HamolusApiError) {
+    throw new Error(`Article ${id} could not be loaded: ${cause.code} ${cause.message}`, { cause })
+  }
+  throw cause
+}
+
+const { title, body, cover, tags, author_name, published_at, excerpt } = article
+
+/**
+ * Render Markdown to HTML at build time.
+ *
+ * Deliberately as small as possible: paragraphs, headings, code, and lists. The point is to
+ * show where the rendering happens — at build time, in the core, or in the browser — not to
+ * become a full renderer. What is **not** here includes bold, italic, and links; adding them
+ * means adding new escaping rules, and that is a decision of its own.
+ *
+ * Two things to hold on to if this is ever swapped for a real renderer:
+ *
+ *   1. **Escape first, then wrap in tags.** Markdown from an untrusted author can contain
+ *      `<script>`. Skip the escaping and a single article can steal an admin session.
+ *   2. **Sanitise attributes.** The `href` in `[text](javascript:...)` is an attack path
+ *      that ordinary text escaping does not catch.
+ *
+ * For production, use `marked` plus `sanitize-html`, or let the core render Markdown to HTML
+ * before storing it — then this example only needs `set:html` with no renderer.
+ */
+function renderMarkdown(source: string): string {
+  const escape = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+
+  const blocks = source.split(/\n{2,}/)
+
+  return blocks
+    .map((block) => {
+      const text = escape(block.trim())
+      if (text === '') return ''
+
+      if (/^```/.test(text)) {
+        const code = text.replace(/^```[a-z]*\n?/, '').replace(/```$/, '')
+        return `<pre><code>${code}</code></pre>`
+      }
+      const heading = /^(#{1,3})\s+(.*)$/.exec(text)
+      if (heading) {
+        const level = heading[1].length
+        return `<h${level}>${heading[2]}</h${level}>`
+      }
+      if (/^[-*]\s+/m.test(text)) {
+        const items = text
+          .split('\n')
+          .map((line) => line.replace(/^[-*]\s+/, ''))
+          .map((line) => `<li>${line}</li>`)
+          .join('')
+        return `<ul>${items}</ul>`
+      }
+      return `<p>${text.replace(/\n/g, '<br>')}</p>`
+    })
+    .join('\n')
+}
+
+const html = renderMarkdown(body)
+---
+
+<Base title={`${title} — {{SITE_LABEL}}`} description={excerpt}>
+  <article>
+    <h1>{title}</h1>
+    <p class="meta">
+      {author_name} · <time datetime={published_at}>{published_at}</time>
+    </p>
+    {tags.map((tag) => <span class="tag">{tag}</span>)}
+
+    {cover && <img src={cover} alt="" width="720" height="360" loading="lazy" decoding="async" />}
+
+    <!--
+      `html` is already escaped and only contains the tags the renderer above allows, so
+      `set:html` here does not open a raw HTML hole. Swap the renderer and its escaping rules
+      change too — check again before dropping `set:html`.
+    -->
+    <div class="prose" set:html={html} />
+  </article>
+</Base>

@@ -1,6 +1,6 @@
 {
   "name": "@hamolus/cli",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Scaffold and extend Hamolus projects: cores, consoles, panels, MCP servers, plugins, seeds and deployment configurations.",
   "keywords": [
     "hamolus",

@@ -1,19 +1,19 @@
 {
-  "name": "{{PROJECT_NAME}}-core",
+  "name": "{{CORE_NAME}}",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "MIT",
   "description": "The {{PROJECT_LABEL}} core: the Hamolus API Worker, configured for {{CORE_MODE}} mode.",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --ip {{DEV_HOST}}",
     "build": "rm -rf dist && wrangler deploy --dry-run --outdir=dist",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hamolus/core": "^0.2.1",
-    "@hamolus/types": "^0.2.1"
+    "@hamolus/core": "^0.2.2",
+    "@hamolus/types": "^0.2.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260920.0",

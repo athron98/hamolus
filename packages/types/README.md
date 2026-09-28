@@ -39,7 +39,7 @@ Build with `pnpm build`; the package ships compiled CJS + ESM + `.d.ts`.
 `CollectionDefinition.mcp` and its `read`/`write`/`hide` helpers, validated
 alongside every other shape in this package.
 
-See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#021--2026-09-28) for every release.
+See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#022--2026-09-28) for every release.
 
 ## License
 

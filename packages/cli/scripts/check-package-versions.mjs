@@ -13,7 +13,7 @@
  * Why this exists: the release version lives in more places than it looks, and every
  * one of the others is invisible to `pnpm install` and to the type checker.
  *
- *   - the six lockstep package manifests;
+ *   - the lockstep package manifests;
  *   - `FALLBACK_RANGES` in the CLI, the ranges a generated project is handed when no
  *     version can be discovered, plus `DEFAULT_VERSION_RANGE` beside it;
  *   - `CLI_VERSION` and `SERVER_VERSION`, the versions the two binaries report;
@@ -51,7 +51,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = resolve(HERE, '..', '..', '..')
 
 /**
- * The lockstep set: the six published packages that a generated project mixes together.
+ * The lockstep set: the published packages a generated project mixes together, or
+ * reaches for by name — `create-hamolus` included, because `npm create hamolus@latest`
+ * hands a scaffold to whatever `@hamolus/cli` its own range resolves to.
  *
  * Discovered rather than hardcoded where possible. `packages/*` is exactly that set
  * and `packages/plugins/**` is exactly the independently-versioned one, so the split
@@ -85,6 +87,22 @@ const OWN_VERSION_CONSTANTS = [
  * correct-looking, and never executed during a normal `hamolus add`.
  */
 const FALLBACK_TABLE = { file: 'packages/cli/src/sources.ts', name: 'FALLBACK_RANGES' }
+
+/**
+ * Published packages a generated project can never legitimately depend on.
+ *
+ * `create-hamolus` is the initializer behind `npm create hamolus@latest`. It exists to
+ * be run once, by npm, before a project exists — a generated project reaches the CLI
+ * through `@hamolus/cli` and never through the initializer. Listing it in
+ * `FALLBACK_RANGES` would not be harmless bookkeeping: the table is what a template's
+ * `{{PACKAGE_NAME}}`-shaped dependency resolution reads, and an entry for a package no
+ * template can name is a claim that something depends on it.
+ *
+ * The exemption is a named list rather than a rule about the name, because the thing
+ * being exempted is a property of *what the package is for* — and a future initializer
+ * should have to argue itself into this list, not be covered by a pattern.
+ */
+const NEVER_IN_A_GENERATED_PROJECT = new Set(['create-hamolus'])
 
 const DEP_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies']
 const RANGE = (version) => `^${version}`
@@ -291,9 +309,11 @@ for (const { file, name, range } of OWN_VERSION_CONSTANTS) {
 const fallbacks = readFallbackTable(FALLBACK_TABLE.file, FALLBACK_TABLE.name)
 ok(`${FALLBACK_TABLE.name} is readable in ${FALLBACK_TABLE.file}`, fallbacks !== undefined)
 if (fallbacks) {
-  const missing = [...expectedVersions.keys()].filter((name) => !fallbacks.has(name))
+  const missing = [...expectedVersions.keys()].filter(
+    (name) => !NEVER_IN_A_GENERATED_PROJECT.has(name) && !fallbacks.has(name),
+  )
   ok(
-    'the fallback table covers every published package',
+    'the fallback table covers every published package a generated project can depend on',
     missing.length === 0,
     missing.join(', '),
   )

@@ -23,7 +23,7 @@
 import { join, relative } from 'node:path'
 import type { ParsedArgs } from '../args.js'
 import { formatLabel, resolveTemplateDirectory } from '../templates.js'
-import { BASIC_TEMPLATE } from './create.js'
+import { BASIC_TEMPLATE, DEFAULT_DEV_HOST } from './create.js'
 import {
   addFromTemplate,
   assertTemplateNotSource,
@@ -41,14 +41,18 @@ import {
  *
  * Cloudflare Worker names only allow lowercase letters, digits and hyphens, so the
  * worker name comes from the kebab-case slug — never from the snake_case project name.
+ * `DEV_HOST` is inherited from the project for the same reason as the console's: a part
+ * added after `hamolus create --host 0.0.0.0` has to answer on the same addresses the
+ * core does, or the two halves of a project disagree about what "local" means.
  */
-function mcpTokens(project: { name: string; scope: string }): Record<string, string> {
+function mcpTokens(project: { name: string; scope: string; devHost?: string }): Record<string, string> {
   return {
     PROJECT_NAME: project.name,
     PROJECT_LABEL: formatLabel(project.name),
     PROJECT_SCOPE: project.scope,
     PROJECT_SLUG: project.name.replace(/_/g, '-'),
     PACKAGE_NAME: `${project.scope}/mcp`,
+    DEV_HOST: project.devHost ?? DEFAULT_DEV_HOST,
   }
 }
 

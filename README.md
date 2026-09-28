@@ -11,6 +11,7 @@ core/       the API Worker (thin seam over @hamolus/core)
 console/    SolidJS admin app
 panels/     generated data-driven app surfaces
 mcp/        Model Context Protocol server for AI agents
+sites/      public sites (Astro, Next.js) reading the core over REST
 seeds/      data generators
 configs/    wrangler presets (staging, production, per land)
 ```
@@ -18,21 +19,51 @@ configs/    wrangler presets (staging, production, per land)
 ## Quickstart
 
 ```bash
+npm create hamolus@latest     # asks ten questions, then builds the project
+```
+
+or, if you would rather answer with flags — or already have the CLI:
+
+```bash
 pnpm add -g @hamolus/cli     # or: npx @hamolus/cli
-hamolus create acme
+hamolus init                  # the same ten questions
+hamolus create acme           # or skip them entirely
 cd acme
 pnpm install
+pnpm dev                      # run the core locally
+```
 
+`hamolus init` and `npm create hamolus@latest` are the same command; every question has a
+flag, and a question whose flag you pass is not asked. So a project is one line:
+
+```bash
+hamolus init acme --mode centralized --land acme --console --mcp --site nextjs
+```
+
+and `hamolus create acme` plus a few `hamolus add` calls is the same project, written out.
+
+```bash
 hamolus add console          # admin app
 hamolus add panel basic      # a generated panel app
 hamolus add mcp              # MCP server for AI agents
+hamolus add site blog        # a public Astro site reading the core over REST
 hamolus add seed basic       # demo data
 hamolus add configuration basic
-
-pnpm dev                     # run the core locally
 ```
 
 `hamolus list` shows what a project contains and where each part came from.
+
+The wizard writes a working `JWT_SECRET` and `ADMIN_KEY` into `core/.dev.vars`, so
+`pnpm dev` runs without a second step. That file is git-ignored; anything you deploy wants
+`wrangler secret put` instead.
+
+### Reaching a dev server from your phone
+
+The seventh question is the LAN. `y` binds the core, the console, the MCP server and any
+site to `0.0.0.0`; a host name like `mac.lan` binds them there instead; `n` keeps everything
+on `127.0.0.1`. The answer is written into each part's `dev` script rather than left as a
+flag to remember, so a project is either reachable as a whole or not at all. It is also
+`hamolus create acme --host 0.0.0.0` afterwards, and `hamolus link`-free either way.
 
 ### Core templates
 
@@ -78,7 +109,8 @@ Pick one at creation time with `--mode`, or add a configuration per mode later.
 
 | Package | What it is |
 | ------- | ---------- |
-| [`@hamolus/cli`](packages/cli) | the scaffolder — `hamolus create` / `add` / `link` / `list` |
+| [`@hamolus/cli`](packages/cli) | the scaffolder — `hamolus init` / `create` / `add` / `link` / `list` |
+| [`create-hamolus`](packages/create-hamolus) | the initializer behind `npm create hamolus@latest` |
 | [`@hamolus/core`](packages/core) | the API Worker: dynamic CRUD, scope, media, panels |
 | [`@hamolus/console`](packages/console) | the SolidJS admin app (also the `add console` source) |
 | [`@hamolus/types`](packages/types) | shared Zod schemas, types and DTOs |

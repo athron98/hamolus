@@ -45,7 +45,7 @@ the specifier ends in `.stylex.ts`.
 ## What's new
 
 Versioned independently of the core packages, and unchanged in this release.
-See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#020--2026-09-28) for every release.
+See the [changelog](https://github.com/hamolus-labs/hamolus/blob/main/CHANGELOG.md#022--2026-09-28) for every release.
 
 ## License
 

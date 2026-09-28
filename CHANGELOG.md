@@ -8,8 +8,49 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.2] — 2026-09-28
+
+Two halves of one complaint: starting a project asked for ten answers that had to
+be found somewhere, and getting a collection definition wrong said nothing about
+what was wrong with it. A wizard asks the questions; a schema states the answer.
+
 ### Added
 
+- **`npm create hamolus@latest`** — a new package, `create-hamolus`, answering the ten
+  questions that used to have to be answered by hand. It is the initializer npm looks
+  for by name, and it is a front door rather than a second door: it picks a command and
+  hands everything to `@hamolus/cli`, so `npm create hamolus@latest` and
+  `npx hamolus init` cannot drift apart.
+- **`hamolus init [name]`** — the same wizard, reachable from an installed CLI. It asks
+  for a project name, a core name, a core mode, predefined collections, a JWT secret, an
+  admin key, whether to expose the dev servers on the LAN, and whether to add a console,
+  an MCP server and a site. Every question has a flag, and a question whose flag is
+  present is not asked. With no terminal, or with `--yes`, nothing is asked and the
+  defaults are used — and the run says so, so a `--yes` in CI is never mistaken for a
+  question that went unanswered. A bare `hamolus create` opens it too, since a name is
+  the one thing it cannot invent.
+- **`hamolus add site <name>`** — a public site that reads the core over REST, with two
+  templates: `astro` (static, fetched at build time) and `nextjs` (App Router, cached
+  with `revalidateTag`). Neither depends on a `@hamolus/*` runtime — a public bundle
+  carries no admin SDK. A site is registered as a workspace glob, so
+  `pnpm -F ./sites/<name> dev` works like every other part.
+- **Local secrets in `core/.dev.vars`** — `--jwt` and `--key` write a working
+  `JWT_SECRET` and `ADMIN_KEY`, and `hamolus init` generates both when you leave them
+  blank. Passing either one completes the pair; passing neither writes no file at all.
+  The file is git-ignored; a deploy wants `wrangler secret put`.
+- **`--core-name <name>`** — the core's package and Worker name, separate from the
+  project's. Previously both came from the directory name.
+- **`--host <address>`** — the address the generated dev servers bind to, written into
+  each part's `dev` script rather than left implicit: `wrangler dev --ip`,
+  `vite --host`, `astro dev --host`, `next dev --hostname`. One flag covers the core, the
+  console, the MCP server and a site, so a project is reachable over the LAN as a whole
+  or not at all.
+- **`--land <name>` and `--colony <name>`** on `hamolus create`, so a multi-tenant core
+  is created pointed at its own land and colony instead of `default`.
+- **`--console`, `--mcp` and `--site <framework>`** on `hamolus create`, for the parts a
+  project usually wants at the same time as its core.
 - **`hamolus://spec/collection-definition`** — a new resource carrying the JSON
   Schema a collection definition must satisfy: every key, which are required, and
   all 19 field types. Read it before `put_collection` instead of guessing a field
@@ -18,6 +59,18 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ### Fixed
 
+- **A generated project containing a site could not be installed.** The generated
+  `pnpm-workspace.yaml` listed `sharp` under `onlyBuiltDependencies` but not under
+  `allowBuilds`, and pnpm 11 treats the map as authoritative. Nothing but Astro pulls
+  `sharp` in, so the gap stayed invisible until a site existed, and then `pnpm install`
+  failed with `ERR_PNPM_IGNORED_BUILDS`. Both settings are now written from one list.
+- **`next build` failed with a bare `fetch failed` when the core was unreachable.**
+  `generateStaticParams` fetches the article list during the build and its failure was
+  left unhandled. It now fails with the same message the Astro template gives, naming
+  the cause and the fix. Deliberately a failure and not an empty site: CI is green, the
+  blog is empty, and nothing says why.
+- **`--template .` was read as a framework named `.`** by `hamolus add site`, and the
+  error then named a typo the user did not make.
 - **`put_collection` now says which field is wrong.** The tool declared its
   `definition` argument as an opaque record, so any bad shape was caught by the
   core as a blanket `400` and the model received `Invalid option: expected one
