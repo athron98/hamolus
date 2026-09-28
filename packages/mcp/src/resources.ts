@@ -33,8 +33,9 @@
  * equivalent tool call return the same bytes.
  */
 
+import { z } from 'zod'
 import { ResourceTemplate, type McpServer, type ReadResourceResult, type Variables } from '@modelcontextprotocol/server'
-import type { CollectionDefinition } from '@hamolus/types'
+import { collectionDefinitionSchema, type CollectionDefinition } from '@hamolus/types'
 import { assertMcpAllows, visibleDefinitions } from './collections'
 import type { CoreClient } from './core'
 import { seg } from './tools/shared'
@@ -144,6 +145,36 @@ export function registerResources(server: McpServer, core: CoreClient): void {
       mimeType: 'application/json',
     },
     (uri) => doc(uri.href, core.get('/_meta/groups')),
+  )
+
+  /* ------------------------------------------------------------------ */
+  /* the shape itself                                                     */
+  /* ------------------------------------------------------------------ */
+
+  server.registerResource(
+    'spec',
+    `${RESOURCE_SCHEME}://spec/collection-definition`,
+    {
+      title: 'Collection definition schema',
+      description:
+        'The JSON Schema a collection definition must satisfy: every key, every field type, and which are required. ' +
+        'Read this before put_collection rather than guessing a field type — a wrong type is the single most common ' +
+        'rejection, and there is no "integer" (a whole number is "number").',
+      mimeType: 'application/schema+json',
+    },
+    // Rendered from the core's own schema rather than written out here. The MCP
+    // package must never restate a field type: the moment it does, a type added
+    // to `@hamolus/types` reaches the core and not this document, and the model
+    // is told a list that has already drifted.
+    (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: 'application/schema+json',
+          text: JSON.stringify(z.toJSONSchema(collectionDefinitionSchema, { io: 'input' }), null, 2),
+        },
+      ],
+    }),
   )
 
   /* ------------------------------------------------------------------ */

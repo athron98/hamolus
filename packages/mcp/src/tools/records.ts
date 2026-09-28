@@ -19,7 +19,7 @@
  */
 
 import { z } from 'zod'
-import type { CollectionDefinition } from '@hamolus/types'
+import { collectionDefinitionSchema, FIELD_TYPES, type CollectionDefinition } from '@hamolus/types'
 import {
   assertMcpAllows,
   assertMcpVisible,
@@ -27,7 +27,19 @@ import {
   visibleDefinitions,
 } from '../collections'
 import type { CoreClient } from '../core'
-import { filterArg, format, nameSchema, paginationArgs, run, runWrite, scopeArgs, scopeArgsSchema, seg, summarize, type ToolSurface } from './shared'
+import {
+  filterArg,
+  format,
+  nameSchema,
+  paginationArgs,
+  run,
+  runWrite,
+  scopeArgs,
+  scopeArgsSchema,
+  seg,
+  summarize,
+  type ToolSurface,
+} from './shared'
 
 /** Core caps `__bulk_delete` at 200 ids; asking for more is a guaranteed 400. */
 const BULK_DELETE_MAX = 200
@@ -72,19 +84,25 @@ export function registerRecordTools(s: ToolSurface, core: CoreClient): void {
         'Create or update a collection definition (write tool; disabled in read-only mode). Creating a collection creates its D1 table ' +
         'and exposes CRUD at /api/<name>. Include the full definition; updating an existing collection auto-migrates new fields. ' +
         'It only ever ADDS columns — dropping, renaming or retyping a field is a manual D1 migration and this tool will not do it. ' +
-        'Set "mcp" to control what this server may do with the collection: "read" (default, read-only), "write", or "hide".',
+        'Set "mcp" to control what this server may do with the collection: "read" (default, read-only), "write", or "hide". ' +
+        'The `definition` argument is validated here against the core\'s own schema before the call goes out, so a wrong field ' +
+        'type is reported against its own index (`fields[2].type`) rather than as a blanket 400. The full field-type list and every ' +
+        'definition key is readable at the `hamolus://spec/collection-definition` resource.',
       inputSchema: z.object({
-        definition: z
-          .record(z.string(), z.unknown())
-          .describe('CollectionDefinition JSON: { name, label?, description?, group?, icon?, timestamps?, softDelete?, mcp?: "read"|"write"|"hide", fields: FieldDefinition[] }.'),
+        definition: collectionDefinitionSchema.describe(
+          'A full CollectionDefinition. Field `type` must be one of: ' +
+            FIELD_TYPES.map((t) => `"${t}"`).join(' | ') +
+            '. Note there is no "integer" — a whole number is "number".',
+        ),
         ...scopeArgs,
       }),
     },
-    runWrite(core, async (args: { definition: Record<string, unknown>; land?: string; colony?: string }) => {
-      const name = String(args.definition.name ?? '')
-      if (!/^[a-z][a-z0-9_]*$/.test(name)) {
-        throw new Error('definition.name must be a snake_case identifier (core metadata).')
-      }
+    runWrite(core, async (args: { definition: CollectionDefinition; land?: string; colony?: string }) => {
+      const name = args.definition.name
+      // No re-validation here: the schema above is the core's own, and the SDK
+      // checks it before this body runs — a second pass would only ever agree
+      // with the first, and the paths it prints are already the model's to act on.
+      //
       // Editing the definition of a collection this server cannot see is how a
       // hidden collection would be un-hidden, so it is refused. A new collection
       // has no stored mode yet and is always allowed — that is how the first one

@@ -8,7 +8,24 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`hamolus://spec/collection-definition`** — a new resource carrying the JSON
+  Schema a collection definition must satisfy: every key, which are required, and
+  all 19 field types. Read it before `put_collection` instead of guessing a field
+  type. It is rendered from `@hamolus/types` at request time, not written out, so
+  a field type added there reaches this document in the same deploy.
+
+### Fixed
+
+- **`put_collection` now says which field is wrong.** The tool declared its
+  `definition` argument as an opaque record, so any bad shape was caught by the
+  core as a blanket `400` and the model received `Invalid option: expected one
+  of …` once per offending field with no indication of *which* — two fields
+  could be wrong and the caller's only move was to count. The argument is now
+  typed with the core's own `collectionDefinitionSchema`, so `tools/list`
+  advertises the 19 field types up front and a rejection names its own path
+  (`definition.fields.2.type`) before the call leaves the server.
 
 ## [0.2.1] — 2026-09-28
 

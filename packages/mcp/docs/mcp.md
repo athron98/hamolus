@@ -48,6 +48,7 @@ return the same bytes.
 
 | URI | Contents |
 | --- | --- |
+| `hamolus://spec/collection-definition` | the JSON Schema a collection definition must satisfy — read it before `put_collection` rather than guessing a field type |
 | `hamolus://collections` | every collection definition — the natural place to start |
 | `hamolus://settings`, `hamolus://localization`, `hamolus://stats`, `hamolus://lands`, `hamolus://groups` | the scope-wide documents, unchanged |
 | `hamolus://collection/{collection}` | one collection definition (listed, so the index is browsable) |
