@@ -76,8 +76,27 @@ const TARGETS = [
   { pkg: 'mcp', repo: 'mcp', kind: 'worker' },
 ]
 
-/** Build output and dependency trees that must never be committed. */
-const SKIP = new Set(['node_modules', 'dist', 'dist-lib', '.turbo', '.wrangler', '.next', 'coverage'])
+/**
+ * Build output, dependency trees, and anything machine-local that must never be copied.
+ *
+ * `.dev.vars` is the important one: the monorepo checkout has one holding a live
+ * ADMIN_KEY and JWT_SECRET. It is git-ignored, so it would not be *committed* — but
+ * copying a real admin key into a scratch directory is exposure the git-ignore is
+ * not there to prevent, and the exported repo generates its own. `.env.example` is
+ * deliberately not in this list: the example is meant to be published.
+ */
+const SKIP = new Set([
+  'node_modules',
+  'dist',
+  'dist-lib',
+  '.turbo',
+  '.wrangler',
+  '.next',
+  'coverage',
+  '.dev.vars',
+  '.env',
+  '.DS_Store',
+])
 
 /** The placeholder ids used across the templates, which Wrangler cannot accept. */
 const PLACEHOLDER_ID = /^\s*"(?:database_id|id)"\s*:\s*"(?:0{32}|0{8}-0{4}-0{4}-0{4}-0{12})"/
