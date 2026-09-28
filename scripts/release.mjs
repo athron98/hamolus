@@ -291,7 +291,13 @@ function bumpVersion(bump, dry) {
         // replacement is `$1${next}` and there is no `$3`: an extra `$3` here does not
         // fail loudly, it writes the literal string `$3` into every range, and the first
         // thing anyone sees is a generated project that will not install.
-        .replace(/('(?:@hamolus\/(?:cli|console|core|mcp|panel|types))': '\^)[^']+'/g, `$1${next}`)
+        //
+        // The replacement has to put the closing quote back. The pattern ends at `[^']+'`
+        // — the quote *included*, since `[^']` would otherwise stop one character short and
+        // leave the quote to be replaced as literal text — so a replacement of `$1${next}`
+        // ends the string with `^0.2.4` and no quote. It parses as a runaway string, which
+        // is what happened on the 0.2.4 bump.
+        .replace(/('(?:@hamolus\/(?:cli|console|core|mcp|panel|types))': '\^)[^']+'/g, `$1${next}'`)
         // The plugins' `^0.1.0` must survive this, so DEFAULT_VERSION_RANGE is matched by
         // name rather than by pattern.
         .replace(/(DEFAULT_VERSION_RANGE = ')[^']+(')/, `$1^${next}$2`),
@@ -354,7 +360,15 @@ function bumpVersion(bump, dry) {
   // the tree itself installable.
   const createManifest = readJson(join(dirFor('create-hamolus'), 'package.json'))
   for (const field of ['dependencies', 'devDependencies', 'peerDependencies']) {
-    if (createManifest[field]?.['@hamolus/cli'] === 'workspace:*') continue
+    const range = createManifest[field]?.['@hamolus/cli']
+    // Both guards, not one. Skipping a field that does not *have* `@hamolus/cli` is the
+    // obvious half; the other half is that `create-hamolus` holds it in `dependencies`, so
+    // a loop that only checked the value would walk into `devDependencies` — which does
+    // not exist — and die on `Cannot set properties of undefined`. That happened on the
+    // 0.2.4 bump, after it had already written every version, so the tree was left at
+    // 0.2.4 with the changelog step unreached. A release script that can only be run
+    // twice is a release script nobody runs twice.
+    if (range === undefined || range === 'workspace:*') continue
     console.log(`  ${dry ? 'would change' : 'changed'}  create-hamolus ${field} @hamolus/cli -> workspace:*`)
     if (!dry) {
       createManifest[field]['@hamolus/cli'] = 'workspace:*'

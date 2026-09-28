@@ -1,6 +1,6 @@
 {
   "name": "@hamolus/console",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "main": "./dist-lib/index.js",
   "types": "./dist-lib/lib.d.ts",

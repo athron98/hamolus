@@ -10,7 +10,7 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 Nothing yet.
 
-## [0.2.3] — 2026-09-28
+## [0.2.4] — 2026-09-28
 
 ### Added
 
@@ -51,6 +51,8 @@ Nothing yet.
   function were invisible to `tsc` because the key lookup is cast. Both spellings are now
   generated separately in `check:generated-app`, because a gate that tested only one of
   them would have passed this.
+
+## [0.2.3] — 2026-09-28
 
 - **`hamolus create <name> --console --mcp --site` no longer throws the flags away.**
   The three optional parts are the wizard's questions, and `runCreate` never implemented
@@ -297,7 +299,8 @@ pnpm up "@hamolus/*@^0.2.0"
 After that, review your collections' `mcp` mode — any collection an agent was
 writing to needs `mcp: 'write'`.
 
-[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/hamolus-labs/hamolus/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/hamolus-labs/hamolus/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/hamolus-labs/hamolus/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/hamolus-labs/hamolus/compare/v0.2.0...v0.2.1

@@ -18,7 +18,7 @@ import { registerResources } from './resources'
 import { registerTools } from './tools'
 
 const SERVER_NAME = 'hamolus'
-const SERVER_VERSION = '0.2.3'
+const SERVER_VERSION = '0.2.4'
 const MCP_ROUTE = '/mcp'
 
 /** What this server offers, in one line each — the root JSON and the logs. */
