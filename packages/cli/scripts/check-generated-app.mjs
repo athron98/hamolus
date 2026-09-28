@@ -591,6 +591,58 @@ try {
     )
   }
 
+  // The first page a new project serves has to say "no content yet", not "error". A brand-new
+  // core has no `articles` collection, so the site gets a 404 with code `NOT_FOUND` — and the
+  // page treated that as a failure, which put "Collection 'articles' is not registered" on the
+  // home page of every project that had not been seeded yet. The empty state was unreachable:
+  // the only way to get an empty list was for the collection to already exist and hold nothing,
+  // which is the one case that needs no explanation.
+  for (const framework of ['astro', 'nextjs']) {
+    const dir = join(REPO, 'templates', 'sites', framework, 'basic', 'src')
+    const lib = readFileSync(join(dir, 'lib', 'hamolus.ts'), 'utf8')
+    const page =
+      framework === 'astro'
+        ? readFileSync(join(dir, 'pages', 'index.astro'), 'utf8')
+        : readFileSync(join(dir, 'app', 'page.tsx'), 'utf8')
+
+    ok(
+      `the ${framework} client can tell a missing collection from a failure`,
+      /export function isMissingCollection[\s\S]*code === 'NOT_FOUND'/.test(lib),
+      'a 404 on a list call means "no content yet", not "the core is broken"',
+    )
+    ok(
+      `the ${framework} home page keeps a missing collection out of the failure path`,
+      /if \(isMissingCollection\(cause\)\)/.test(page) && /missingCollection = true/.test(page),
+      'without this branch, a fresh project shows an error instead of the empty state',
+    )
+    ok(
+      `the ${framework} empty state is reachable`,
+      /!failure && !missingCollection && articles\.length === 0/.test(page),
+      'the guard has to exclude the missing-collection case, or the message never shows',
+    )
+    ok(
+      `the ${framework} home page tells a fresh user what to do`,
+      /Run a seed to\s*\n?\s*create one/.test(page.replace(/\s+/g, ' ')) ||
+        /Run a seed to/.test(page),
+      'the empty state has to name the next action, not just say the list is empty',
+    )
+  }
+
+  // A failed fetch leaves `articles` empty, so the Next list used to render an empty `<ul>`
+  // under its error message. Astro guards the same thing with `!failure &&` on the map; this
+  // is the JSX equivalent, which is the part a typescript compiler will not tell you about.
+  {
+    const page = readFileSync(
+      join(REPO, 'templates', 'sites', 'nextjs', 'basic', 'src', 'app', 'page.tsx'),
+      'utf8',
+    )
+    ok(
+      'the Next list is not rendered empty when the fetch failed',
+      /\{articles\.length > 0 && \(\s*<ul>/.test(page),
+      'an empty <ul> under an error message is a second, quieter symptom of the same failure',
+    )
+  }
+
   // A panel is not a process, so it must not appear in the root `dev`. A `--filter` for a
   // path with no `dev` script fails the whole parallel run, which would make asking for
   // a panel the fastest way to break `pnpm dev`.

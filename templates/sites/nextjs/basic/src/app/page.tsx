@@ -1,7 +1,7 @@
 // Copyright 2026 Gilang Albathin Nurhabibi <https://github.com/athron98>, MIT
 import Link from 'next/link'
 import { listPublishedArticles } from '@/lib/articles'
-import { HamolusApiError } from '@/lib/hamolus'
+import { HamolusApiError, isMissingCollection } from '@/lib/hamolus'
 
 /**
  * The front page.
@@ -19,14 +19,23 @@ export const dynamic = 'force-dynamic'
 export default async function HomePage() {
   let articles: Awaited<ReturnType<typeof listPublishedArticles>>['data'] = []
   let failure: string | null = null
+  // The core has no `articles` collection yet — a new project, not a broken one. Kept apart
+  // from `failure` because a project that has simply never been seeded used to render
+  // "Collection 'articles' is not registered" as an error, which is the wrong reading of a
+  // core that has nothing in it yet.
+  let missingCollection = false
 
   try {
     articles = (await listPublishedArticles()).data
   } catch (cause) {
-    failure =
-      cause instanceof HamolusApiError
-        ? `${cause.code} — ${cause.message}`
-        : 'Could not reach the core.'
+    if (isMissingCollection(cause)) {
+      missingCollection = true
+    } else {
+      failure =
+        cause instanceof HamolusApiError
+          ? `${cause.code} — ${cause.message}`
+          : 'Could not reach the core.'
+    }
   }
 
   return (
@@ -39,21 +48,36 @@ export default async function HomePage() {
         </p>
       )}
 
-      {!failure && articles.length === 0 && <p>No articles have been published yet.</p>}
+      {missingCollection && (
+        <p>
+          No articles yet — the core has no <code>articles</code> collection. Run a seed to
+          create one, or define the collection and add records to it.
+        </p>
+      )}
 
-      <ul>
-        {articles.map((article) => (
-          <li key={article.id}>
-            <h2>
-              <Link href={`/blog/${article.slug}`}>{article.title}</Link>
-            </h2>
-            <p>
-              {article.author_name} · <time dateTime={article.published_at}>{article.published_at}</time>
-            </p>
-            <p>{article.excerpt}</p>
-          </li>
-        ))}
-      </ul>
+      {!failure && !missingCollection && articles.length === 0 && (
+        <p>No articles have been published yet.</p>
+      )}
+
+      {/* The list is guarded too, not just the messages. `articles` is empty on both failure
+          paths, so this renders nothing rather than an empty `<ul>` — which is what a failed
+          fetch used to leave behind, under the error text. */}
+      {articles.length > 0 && (
+        <ul>
+          {articles.map((article) => (
+            <li key={article.id}>
+              <h2>
+                <Link href={`/blog/${article.slug}`}>{article.title}</Link>
+              </h2>
+              <p>
+                {article.author_name} ·{' '}
+                <time dateTime={article.published_at}>{article.published_at}</time>
+              </p>
+              <p>{article.excerpt}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   )
 }

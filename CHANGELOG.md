@@ -10,6 +10,19 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 Nothing yet.
 
+## [0.2.7] — 2026-09-28
+
+### Fixed
+
+- **A brand-new project no longer shows an error on its home page.** With no `articles`
+  collection in a fresh core, the site got a 404 and treated it as a failure, so the page
+  read `Could not load articles: NOT_FOUND — Collection 'articles' is not registered`. The
+  "no articles yet" message could not be reached: the only way to get an empty list was
+  for the collection to already exist and hold nothing, which is the one case that needs no
+  explanation. A missing collection is now a third state, separate from a failure, and it
+  names the next action instead of apologising for the data. The Next list was rendering an
+  empty `<ul>` under its error message for the same reason; it is guarded now too.
+
 ## [0.2.6] — 2026-09-28
 
 ### Added
@@ -32,6 +45,9 @@ Nothing yet.
   rather than a string. `check:generated-app` now derives the field list from the templates'
   own `Article` interface instead of a hand-copied one, and asserts both of these, so the
   definition cannot be "improved" into a site that builds and renders nothing.
+
+### Fixed
+
 
 ### Note
 
@@ -362,7 +378,8 @@ pnpm up "@hamolus/*@^0.2.0"
 After that, review your collections' `mcp` mode — any collection an agent was
 writing to needs `mcp: 'write'`.
 
-[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/hamolus-labs/hamolus/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/hamolus-labs/hamolus/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/hamolus-labs/hamolus/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/hamolus-labs/hamolus/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/hamolus-labs/hamolus/compare/v0.2.3...v0.2.4

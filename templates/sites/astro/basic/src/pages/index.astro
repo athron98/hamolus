@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro'
 import { listPublishedArticles } from '../lib/articles'
-import { HamolusApiError } from '../lib/hamolus'
+import { HamolusApiError, isMissingCollection } from '../lib/hamolus'
 
 /**
  * The article list.
@@ -17,16 +17,26 @@ import { HamolusApiError } from '../lib/hamolus'
 
 let articles: Awaited<ReturnType<typeof listPublishedArticles>>['data'] = []
 let failure: string | undefined
+/** The core has no `articles` collection yet — a new project, not a broken one. */
+let missingCollection = false
 
 try {
   articles = (await listPublishedArticles()).data
 } catch (cause) {
-  // A build must not stop silently because the core is down. HTML still gets emitted, but
-  // the page carries an explanation instead of a misleading empty list.
-  failure =
-    cause instanceof HamolusApiError
-      ? `${cause.code} — ${cause.message}`
-      : 'Could not reach the core.'
+  if (isMissingCollection(cause)) {
+    // Kept apart from `failure` on purpose. Before this, a project that had simply never been
+    // seeded showed "Could not load articles: NOT_FOUND — Collection 'articles' is not
+    // registered", and the "no articles yet" message below was unreachable, because the only
+    // way to get an empty list was for the collection to already exist and hold nothing.
+    missingCollection = true
+  } else {
+    // A build must not stop silently because the core is down. HTML still gets emitted, but
+    // the page carries an explanation instead of a misleading empty list.
+    failure =
+      cause instanceof HamolusApiError
+        ? `${cause.code} — ${cause.message}`
+        : 'Could not reach the core.'
+  }
 }
 ---
 
@@ -41,7 +51,18 @@ try {
     )
   }
 
-  {!failure && articles.length === 0 && <p>No articles have been published yet.</p>}
+  {
+    missingCollection && (
+      <p>
+        No articles yet — the core has no <code>articles</code> collection. Run a seed to
+        create one, or define the collection and add records to it.
+      </p>
+    )
+  }
+
+  {!failure && !missingCollection && articles.length === 0 && (
+    <p>No articles have been published yet.</p>
+  )}
 
   {
     !failure &&

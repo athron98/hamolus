@@ -74,6 +74,21 @@ export class HamolusApiError extends Error {
   }
 }
 
+/**
+ * True when the core does not have the collection the page asked for.
+ *
+ * A brand-new project is in exactly this state, so treating it as a failure makes the first
+ * thing a new user sees an error — "Collection 'articles' is not registered" — instead of the
+ * "no content yet" page. The empty state is the honest rendering of a core that has nothing
+ * in it, and it is the one the wizard's seed exists to move you out of.
+ *
+ * The distinction is by error code, not by status: `404` alone would also cover a missing
+ * record, and a missing record on a list call is the same situation from here.
+ */
+export function isMissingCollection(cause: unknown): boolean {
+  return cause instanceof HamolusApiError && cause.code === 'NOT_FOUND'
+}
+
 const origin = (process.env.HAMOLUS_API_ORIGIN ?? '{{CORE_ORIGIN}}').replace(/\/+$/, '')
 
 const apiBase = origin.endsWith('/api') ? origin : `${origin}/api`
