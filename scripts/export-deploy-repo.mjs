@@ -44,7 +44,12 @@
  *    nobody standing in front of a first deploy to paste a real one.
  *  - A `pnpm-workspace.yaml` with `allowBuilds` is written. pnpm >= 10 refuses
  *    dependency lifecycle scripts by default, and `workerd` — the Workers runtime
- *    itself — is one of them. Blocked, wrangler cannot start.
+ *    itself — is one of them. Blocked, wrangler cannot start. It also carries a
+ *    `packages` key, because a settings-only workspace file reads as a workspace with
+ *    no members and pnpm then refuses to run anything at all.
+ *  - Scripts that shell out to `pnpm` are rewritten to `npm run`. An exported repo
+ *    ships no lockfile, so which package manager builds it is Cloudflare's choice, not
+ *    ours — a script that names pnpm only works if it guessed the same one.
  *  - `prepack` is dropped. It shells out to `../cli/scripts/copy-license.mjs`, a
  *    path that only exists inside the monorepo.
  *
@@ -158,8 +163,25 @@ function fixPackageJson(pkg, into) {
     }
   }
 
-  // Only meaningful inside the monorepo, and it points at a path that is not exported.
-  if (json.scripts) delete json.scripts.prepack
+  if (json.scripts) {
+    // Only meaningful inside the monorepo, and it points at a path that is not exported.
+    delete json.scripts.prepack
+
+    // A script that shells out to `pnpm` names a package manager this repository does
+    // not control. Cloudflare picks the manager from whatever lockfile it finds, and an
+    // exported repo ships none — so the same fork can install under bun and then fail on
+    // the first command that assumed pnpm. `npm run` is the one spelling that works
+    // under every manager, because each of them puts `node_modules/.bin` on PATH before
+    // running a script. The monorepo keeps pnpm; only the copy is rewritten.
+    //
+    // The argument must be a bare script name. `pnpm -F <pkg> <script>` is a different
+    // shape with no `npm run` equivalent, and rewriting it would produce a command that
+    // is not merely wrong but unparseable, so anything filtered here is left alone.
+    for (const [name, body] of Object.entries(json.scripts)) {
+      if (typeof body !== 'string') continue
+      json.scripts[name] = body.replace(/(^|&& |\|\| )pnpm (?!-)([a-z][\w:]*)(?=\s|$)/g, '$1npm run $2')
+    }
+  }
 
   writeJson(path, json)
 }
@@ -199,6 +221,13 @@ function dropPlaceholderIds(into) {
  * pnpm >= 10 blocks dependency lifecycle scripts unless they are allowlisted, and
  * `workerd` is the Workers runtime. Without this, `wrangler` cannot start, so the
  * Cloudflare build fails on a policy rather than on the code.
+ *
+ * The `packages` key is not optional. This file exists only to carry settings, and a
+ * pnpm-workspace.yaml without `packages` is read as a workspace root with no members —
+ * pnpm then refuses to run *any* command, with `ERROR packages field missing or empty`
+ * before it has looked at a single script. Newer pnpm relaxed this; the Cloudflare
+ * build image pins an older one, and the failure it produced was the deploy command
+ * dying on a file that carries nothing but comments. One package, this one: `['.']`.
  */
 function writePnpmWorkspace(into, hamolusDeps) {
   const excludes = hamolusDeps.map((d) => `  - '${d.name}@${d.version}'`)
@@ -206,6 +235,14 @@ function writePnpmWorkspace(into, hamolusDeps) {
     join(into, 'pnpm-workspace.yaml'),
     [
       '# Written by scripts/export-deploy-repo.mjs — do not edit by hand.',
+      '',
+      "# The only package in this repository is the one at the root. This key is not",
+      '# optional: a pnpm-workspace.yaml without `packages` reads as a workspace with no',
+      "# members, and pnpm then refuses every command with 'packages field missing or",
+      "# empty' — including the deploy build, which is what a Cloudflare image running an",
+      '# older pnpm did. Dropping this line breaks the deploy, not the install.',
+      'packages:',
+      "  - '.'",
       '',
       '# pnpm >= 10 blocks dependency lifecycle scripts unless they are allowlisted here,',
       '# and `workerd` IS the Workers runtime: block it and wrangler cannot start, so the',
