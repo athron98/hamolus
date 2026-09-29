@@ -12,16 +12,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hamolus/console": "^0.2.8",
+    "@hamolus/console": "^0.2.9",
     "@hamolus/plugin-console-kanban": "^0.1.0",
     "@hamolus/plugin-console-todo": "^0.1.0",
-    "@hamolus/types": "^0.2.8"
+    "@hamolus/types": "^0.2.9"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "~5.9.0",
     "vite": "^8.3.0",
-    "@hamolus/console": "^0.2.8",
-    "@hamolus/types": "^0.2.8"
+    "@hamolus/console": "^0.2.9",
+    "@hamolus/types": "^0.2.9"
   }
 }

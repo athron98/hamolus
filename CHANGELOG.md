@@ -10,6 +10,45 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 Nothing yet.
 
+## [0.2.9] — 2026-09-29
+
+### Changed
+
+- **`_configs` loses its `scope` column; a row now belongs to a colony.** `scope` was
+  doing two incompatible jobs at once — partitioning the table *and* describing who the
+  value was for — and the partition won every time. A row now carries `land` and `colony`
+  and the key is unique per `(land, colony, key)`. A land-level user sees their own land
+  plus all of its colonies, a colony-level user sees only their colony, and the scope
+  filter is hidden unless the user holds `lands.read` / `colonies.read`. Existing rows are
+  replaced by sample data rather than migrated: the old shape had no correct destination.
+
+### Fixed
+
+- **Authorization read the role name, not the scope.** `isPlatformAdmin()` tested
+  `role === 'admin'`, and the default colony-level privilege is *named* `admin` — so
+  every colony administrator had platform-wide reach. Reach is now read from the `scope`
+  claim. A gate (`check:config-scope-acl`) exists so the next reader does not have to
+  re-derive this from a name that reads like authority.
+- **A land and a colony could be requested together without being checked.** For a
+  platform admin the list path read `?colony` and dropped `?land`, so a request for a
+  land-B row returned land-A data — a wrong answer that looked right. It is now
+  `400 SCOPE_MISMATCH` when the registry says the colony belongs to another land.
+- **Re-seeding `_configs` could fail outright on the most affected database.** The old
+  primary key `(scope, key)` let `('core','theme.mode')` and `('site','theme.mode')`
+  coexist, which was routine once `scope` became a UI filter. Remapped to
+  `(land, colony, key)` they collide, and an ordinary `INSERT` cancelled the entire
+  migration, leaving every config read a 500. The seed is now `INSERT OR IGNORE` +
+  upsert.
+- **The console's Cloudflare deploy failed on a file that held nothing but comments.**
+  The generated `pnpm-workspace.yaml` carried `allowBuilds` but no `packages` key, and
+  pnpm reads the *existence* of that file as "this is a workspace root" — so it saw zero
+  members and refused to run any command, deploy included. Older pnpm (what the Cloudflare
+  build image pins) still enforces this. The exported file now declares its one package.
+- **An exported deploy repo named a package manager it does not control.** Cloudflare
+  picks the manager from whichever lockfile it finds, and the exported repo ships none,
+  so `deploy` running `pnpm build` worked only when the guess matched. Exports now rewrite
+  `pnpm <script>` to `npm run <script>`, the one spelling that works under every manager.
+
 ## [0.2.8] — 2026-09-28
 
 ### Added
