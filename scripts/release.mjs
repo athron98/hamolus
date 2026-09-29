@@ -133,8 +133,7 @@ async function publish(requested) {
     // npm answers 403 and there is no way back. Skipping is what makes a publish that
     // died halfway (a bad token, an expired OTP, a 0.2.6 that never landed) resumable
     // instead of permanently stuck on the first entry.
-    const landed = spawnSync('npm', ['view', `${name}@${version}`, 'version'], { encoding: 'utf8' })
-    if (landed.status === 0 && landed.stdout.trim() === version) {
+    if (hasVersion(name, version)) {
       console.log(`=== ${name}@${version} === already published, skipping\n`)
       continue
     }
@@ -143,6 +142,13 @@ async function publish(requested) {
     // Inherits the terminal, so npm's OTP prompt is a prompt and not a hang.
     const result = spawnSync('pnpm', ['-F', name, 'publish', '--no-git-checks'], { stdio: 'inherit' })
     if (result.status !== 0) {
+      // The registry read replica lags the write path, so a version npm already accepted
+      // is not yet answerable to `npm view` and a re-publish earns E409. Neither is a
+      // real failure, and aborting there would strand every later package in the order.
+      if (hasVersion(name, version, { waitMs: 90_000 })) {
+        console.log(`=== ${name}@${version} === landed anyway; the registry just lagged\n`)
+        continue
+      }
       // Stopping here is the point of the order: a package whose dependency is missing
       // breaks installs for everyone the moment it lands. Later entries are not worse
       // than useless, they are not attempted.
@@ -163,6 +169,29 @@ Tag and push it:
 
   git tag v${version} && git push origin main v${version}
 `)
+}
+
+/**
+ * Whether the registry already serves this exact version.
+ *
+ * npm accepts a publish on its write path well before the read replica answers
+ * `npm view`, so a false here means "not visible yet", never "not published" — which is
+ * why `waitMs` exists. Callers must treat the ambiguity as unknown, not as room to
+ * publish the same immutable version again.
+ */
+function hasVersion(name, version, { waitMs = 0 } = {}) {
+  const deadline = Date.now() + waitMs
+  for (;;) {
+    const found = spawnSync('npm', ['view', `${name}@${version}`, 'version'], { encoding: 'utf8' })
+    if (found.status === 0 && found.stdout.trim() === version) return true
+    if (Date.now() >= deadline) return false
+    sleep(3_000)
+  }
+}
+
+/** Block the current thread; the caller is synchronous and holds no other work. */
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 }
 
 function git(args) {
