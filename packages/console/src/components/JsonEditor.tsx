@@ -83,6 +83,15 @@ const styles = stylex.create({
     borderColor: 'transparent',
     overflow: 'hidden',
   },
+  readOnly: {
+    // A read-only editor has no caret to show and nothing to submit, so it drops the
+    // focus treatment that says "type here" and reads as a rendered document instead.
+    cursor: 'default',
+    boxShadow: tokens.shadowInput,
+    ':focus': {
+      boxShadow: tokens.shadowInput,
+    },
+  },
   key: { color: tokens.accent },
   str: { color: tokens.ok },
   num: { color: 'var(--json-num)' },
@@ -118,6 +127,13 @@ export function JsonEditor(props: {
   rows?: number
   placeholder?: string
   ariaLabel?: string
+  /**
+   * Show the value without letting it be edited. The syntax-highlighted layer underneath
+   * is a `<pre>`, so a read-only editor is still readable — this is how a screen offers
+   * "here is the stored JSON" to a session that is not allowed to write it, instead of
+   * hiding the value behind an error the user can do nothing about.
+   */
+  readOnly?: boolean
 }) {
   const [valid, setValid] = createSignal<null | boolean>(null)
   const [error, setError] = createSignal<string | null>(null)
@@ -189,6 +205,7 @@ export function JsonEditor(props: {
   })
 
   const onInput = (e: Event) => {
+    if (props.readOnly) return
     const v = (e.currentTarget as HTMLTextAreaElement).value
     props.onChange(v)
     validate(v)
@@ -196,7 +213,7 @@ export function JsonEditor(props: {
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key !== 'Tab' || !taRef) return
+    if (props.readOnly || e.key !== 'Tab' || !taRef) return
     e.preventDefault()
     const ta = taRef
     const start = ta.selectionStart
@@ -245,10 +262,12 @@ export function JsonEditor(props: {
           onMouseDown={onMouseDown}
           spellcheck={false}
           autoCapitalize="off"
+          readOnly={props.readOnly}
           placeholder={props.placeholder}
           aria-label={props.ariaLabel ?? 'JSON editor'}
+          aria-readonly={props.readOnly ? 'true' : undefined}
           rows={props.rows ?? 14}
-          {...stylex.props(styles.layer, styles.textarea)}
+          {...stylex.props(styles.layer, styles.textarea, ...(props.readOnly ? [styles.readOnly] : []))}
         />
       </div>
       <Show when={error() !== null || valid() !== null}>

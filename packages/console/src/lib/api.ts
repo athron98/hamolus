@@ -18,7 +18,6 @@ import type {
   CollectionDefinition,
   ConfigEntry,
   ConfigEntryInput,
-  ConfigScope,
   ColonyDto,
   ColonyDefinitionInput,
   DashboardStats,
@@ -132,6 +131,16 @@ export interface AuthMeResponse {
 
 export interface ConfigListResponse {
   data: ConfigEntry[]
+}
+
+/**
+ * Which part of the land/colony tree a config request addresses. Omit both for
+ * "everything this session may see". The core rejects a target the session does not
+ * own, so this is a selector, not a permission.
+ */
+export interface ConfigTarget {
+  land?: string
+  colony?: string
 }
 
 export class ApiError extends Error {
@@ -503,18 +512,18 @@ export const api = {
     return request(`/_auth/users/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
 
-  // ---- config ----
+  // ---- config (one entry per land + colony; the colony *is* the scope) ----
 
-  listConfigs(scope?: ConfigScope): Promise<ConfigListResponse> {
-    return request(`/_config${scope ? `?scope=${encodeURIComponent(scope)}` : ''}`)
+  listConfigs(target?: ConfigTarget): Promise<ConfigListResponse> {
+    return request(`/_config${toQuery({ land: target?.land, colony: target?.colony })}`)
   },
 
-  putConfig(key: string, input: ConfigEntryInput): Promise<ItemResponse<ConfigEntry>> {
-    return request(`/_config/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify(input) })
+  putConfig(key: string, input: ConfigEntryInput, target?: ConfigTarget): Promise<ItemResponse<ConfigEntry>> {
+    return request(`/_config/${encodeURIComponent(key)}${toQuery({ land: target?.land, colony: target?.colony })}`, { method: 'PUT', body: JSON.stringify(input) })
   },
 
-  deleteConfig(key: string): Promise<null> {
-    return request(`/_config/${encodeURIComponent(key)}`, { method: 'DELETE' })
+  deleteConfig(key: string, target?: ConfigTarget): Promise<null> {
+    return request(`/_config/${encodeURIComponent(key)}${toQuery({ land: target?.land, colony: target?.colony })}`, { method: 'DELETE' })
   },
 
   // ---- universe (platform land/colony registry — `lands.*` / `colonies.*` permissions) ----

@@ -257,23 +257,22 @@ Full reference: [KV settings](../../packages/core/docs/settings.md).
 
 ## Config entries
 
-Key/value rows in the internal `_configs` table, scoped per land and colony, for
+Key/value rows in the internal `_configs` table, one row per **colony** per key, for
 values that are individually addressable — the shape to reach for when settings'
 free-form blob is not enough.
 
 | Method | Endpoint | Permission | Behaviour |
 | ------ | -------- | ---------- | --------- |
-| `GET` | `/_config` | `config.read` | List entries, optionally `?scope=core\|console\|site`. |
-| `GET` | `/_config/{key}` | `config.read` | One entry. |
+| `GET` | `/_config` | `config.read` | List what the session may see. `?land=` = every colony of that land, `?colony=` = one colony, neither = everything reachable. |
+| `GET` | `/_config/{key}` | `config.read` | One entry. A land-scoped session must add `?colony=`. |
 | `PUT` | `/_config/{key}` | `config.write` | Upsert. The body's `key`, if present, must match the path. |
 | `DELETE` | `/_config/{key}` | `config.write` | Delete → `204`. |
 
 ```jsonc
-// PUT /api/_config/site.theme
+// PUT /api/_config/site.theme?colony=kitchen_cny
 {
   "value": { "mode": "dark", "palette": "blue" },
-  "scope": "site",
-  "description": "Public site appearance"
+  "description": "Public appearance"
 }
 ```
 
@@ -283,14 +282,25 @@ free-form blob is not enough.
 | -------- | ---- | -------- | ------- | ----- |
 | `key` | `string` | ✅ | — | `^[a-z][a-z0-9._-]*$`, max 100. Bound as a parameter, never as an SQL identifier. |
 | `value` | `unknown` | ✅ | — | Arbitrary JSON. |
-| `scope` | `'core' \| 'console' \| 'site'` | | `'core'` | Which surface the entry belongs to. |
 | `description` | `string \| null` | | | `trim()`, max 255. |
 
 `.strict()` — unknown keys are rejected. A `PUT` whose body does not match the
-path key is `400 VALIDATION`.
+path key is `400 VALIDATION`, and a body still carrying the removed `scope` field is
+rejected the same way rather than ignored.
 
-Entries are **per scope**: the same key in two colonies is two rows, and deleting
-a land or colony deletes its config with it.
+The response carries the row's own `land` and `colony`, so a caller that asked for a land
+can tell two colonies apart without a second request. On write, both come from the
+target the request names: a colony session's own colony, a land session's `?colony=`,
+and for a platform admin whichever it names.
+
+Entries are **per colony**: the same key in two colonies is two rows with independent
+values, and deleting a land or colony deletes its config with it.
+
+What a session may reach follows the **scope** of its privilege — never the target in the
+query, and never a role *name* (the default colony role is called `admin`, which says
+nothing about how far it reaches). A land admin sees its whole land and must name a
+colony to write; a colony admin sees only its own colony and gets `403` rather than a
+silent narrowing when it asks for a sibling.
 
 ## Choosing a surface
 
@@ -299,7 +309,7 @@ a land or colony deletes its config with it.
 | The set of locales, reviewed in a PR | `core.config.ts` |
 | The set of locales, changed by an operator today | KV settings `localization` |
 | Site name, nav, UI copy, feature flags | KV settings |
-| One addressable value a frontend fetches by key | a config entry with `scope: 'site'` |
+| One addressable value a frontend fetches by key | a config entry in that colony |
 | A credential | a Wrangler secret |
 | A resource id (D1, KV, R2) | a Wrangler binding in `wrangler.jsonc` |
 | A per-environment override of any of the above | a named Wrangler configuration |
@@ -317,7 +327,7 @@ a name.
 | Binding / var | Kind | Purpose |
 | ------------- | ---- | ------- |
 | `DB` | D1 binding | The database. |
-| `SETTINGS` | KV binding | The settings blob (`settings:v1`). |
+| `SETTINGS` | KV binding | The settings blob, keyed `settings:{land}:{colony}:v1`. |
 | `MEDIA` | R2 binding | Media objects. |
 | `JWT_SECRET` | **secret** | Signs JWTs. |
 | `ADMIN_KEY` | **secret** | Legacy admin login key. |
@@ -343,8 +353,9 @@ One codebase, several environments, added as configuration files only. See
 | Code | Status | Cause |
 | ---- | ------ | ----- |
 | `VALIDATION` | 400 | A config entry failed `configEntrySchema`; the message names the path. |
-| `INVALID_QUERY` | 400 | `?scope=` was not one of `core`, `console`, `site`. |
-| `FORBIDDEN` | 403 | Missing `config.read` / `config.write` or `settings.read` / `settings.write`. |
+| `SCOPE_REQUIRED` | 400 | A land-scoped session addressed a single entry without naming `?colony=`; the message names the parameter. |
+| `SCOPE_MISMATCH` | 400 | `?land=` and `?colony=` were both given and the registry says that colony belongs to another land. |
+| `FORBIDDEN` | 403 | Missing `config.read` / `config.write` or `settings.read` / `settings.write`, or a target outside what the privilege's scope reaches. |
 
 A bad `core.config.ts` or `console.config.ts` does not produce a 400 — it throws
 at import, naming the file:

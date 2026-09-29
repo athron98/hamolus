@@ -18,7 +18,7 @@ User says: set config, add locale, change site name, PUBLIC_GETS, CORE_MODE, env
 | `core.config.ts` | core repo root | yes | `.strict()`; today only `localization` |
 | `console.config.ts` | console root | yes | `.strict()`; exactly one property: `plugins` (default `[]`) |
 | KV settings | Cloudflare KV `settings:{land}:{colony}:v1` | no | Free-form JSON; only key core reads is `localization`; `GET/PUT /_meta/settings` |
-| Config entries | `_configs` table via `/_config/{key}` | no | `.strict()` `configEntrySchema`; `key ^[a-z][a-z0-9._-]*$`, `scope: core|console|site` |
+| Config entries | `_configs` table via `/_config/{key}` | no | `.strict()` `configEntrySchema`; `key ^[a-z][a-z0-9._-]*$`; one row per `(land, colony, key)`, targeted with `?land=` / `?colony=` |
 | Wrangler vars/secrets | `wrangler.jsonc`, `configs/*/wrangler.jsonc` | redeploy | Credentials are **secrets** (`JWT_SECRET`, `ADMIN_KEY`, `PANEL_ASSET_SECRET`, `SUPER_ADMIN_*`); vars: `PUBLIC_GETS`, `CORE_MODE`, `DEFAULT_LAND`, `DEFAULT_COLONY` |
 
 ## Localization (only overlap)

@@ -8,6 +8,7 @@
  * Licensed under the MIT License. See the LICENSE file at the repository root.
  */
 
+import { isColonyId, isLandId } from './scope'
 import type { PrivilegeScope } from './scope'
 import { z } from 'zod'
 
@@ -284,16 +285,19 @@ export const superAdminUpdateSchema = z
 
 export type SuperAdminUpdateInput = z.infer<typeof superAdminUpdateSchema>
 
-/** Where a configuration entry applies. */
-export const CONFIG_SCOPES = ['core', 'console', 'site'] as const
-export type ConfigScope = (typeof CONFIG_SCOPES)[number]
-
-/** A key/value configuration entry stored in the internal `_configs` table. */
+/**
+ * A key/value configuration entry stored in the internal `_configs` table.
+ *
+ * An entry belongs to exactly one land and one colony — there is no separate
+ * classification column. Which colony it is *is* the scope, so a land-level user
+ * edits their colonies and a colony-level user never sees another one.
+ */
 export interface ConfigEntry {
   key: string
   /** Arbitrary JSON value. */
   value: unknown
-  scope: ConfigScope
+  land: string
+  colony: string
   description?: string | null
   updatedAt: string
 }
@@ -307,16 +311,32 @@ export const configEntrySchema = z
       .max(100)
       .regex(/^[a-z][a-z0-9._-]*$/, 'Key must start with a letter and use lowercase, digits, dots, dashes or underscores'),
     value: z.unknown(),
-    scope: z.enum(CONFIG_SCOPES).default('core'),
     description: z.string().trim().max(255).nullable().optional(),
   })
   .strict()
 
 export type ConfigEntryInput = z.infer<typeof configEntrySchema>
 
+/**
+ * `?land=` widens a read to every colony of that land; `?colony=` narrows it to one.
+ * Both are optional and both are checked against the caller's access by the core, so
+ * a query is a request, not a grant. Omitting them means "whatever this session may
+ * see", which is not the same thing as "everything" for a pinned session.
+ */
 export const configListQuerySchema = z
   .object({
-    scope: z.enum(CONFIG_SCOPES).optional(),
+    land: z
+      .string()
+      .trim()
+      .min(1)
+      .refine(isLandId, 'Land must be a name ending in "_lnd" (or "root_lnd")')
+      .optional(),
+    colony: z
+      .string()
+      .trim()
+      .min(1)
+      .refine(isColonyId, 'Colony must be a name ending in "_cny" (or "root_cny")')
+      .optional(),
   })
   .strict()
 

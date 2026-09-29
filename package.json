@@ -35,6 +35,8 @@
     "clean": "turbo clean",
     "check:panel-acl": "pnpm -F @hamolus/core check:panel-acl",
     "check:scope-colony-resolution": "pnpm -F @hamolus/core check:scope-colony-resolution",
+    "check:config-scope-acl": "pnpm -F @hamolus/core check:config-scope-acl",
+    "check:config-migration": "pnpm -F @hamolus/core check:config-migration",
     "check:localization": "pnpm -F @hamolus/core check:localization",
     "check:localization-api": "pnpm -F @hamolus/core check:localization-api",
     "check:code-definitions": "pnpm -F @hamolus/core check:code-definitions",

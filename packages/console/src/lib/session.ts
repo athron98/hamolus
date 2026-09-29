@@ -40,6 +40,17 @@ const stored = loadStored()
 const [user, setUser] = createSignal<AuthUser | null>(stored.user ?? null)
 const [permissions, setPermissions] = createSignal<Permission[]>(stored.permissions ?? [])
 
+/**
+ * Whether `/me` has confirmed the stored snapshot at least once.
+ *
+ * The token and the session snapshot live in two different localStorage keys, so they can
+ * disagree — a hand-swapped token, a half-finished login, two tabs. A permission check
+ * against a *stale* snapshot is the dangerous direction: it reports a right the current
+ * token does not have, and the request it authorises comes back 403. Anything gated on a
+ * permission should therefore wait for this instead of trusting `user() !== null`.
+ */
+const [hydrated, setHydrated] = createSignal(false)
+
 function persist() {
   try {
     localStorage.setItem(
@@ -55,12 +66,14 @@ function persist() {
 export function applySession(nextUser: AuthUser, nextPermissions: Permission[]): void {
   setUser(nextUser)
   setPermissions(nextPermissions)
+  setHydrated(true)
   persist()
 }
 
 export function clearSession(): void {
   setUser(null)
   setPermissions([])
+  setHydrated(false)
   try {
     localStorage.removeItem(SESSION_KEY)
   } catch {
@@ -86,8 +99,12 @@ export async function hydrateSession(): Promise<boolean> {
     applySession(data.user, data.permissions)
     return true
   } catch {
+    // A failed `/me` is not proof of a bad session: the core can be briefly unreachable
+    // while the stored snapshot is still the best answer available. Mark it settled so
+    // permission-gated queries run against that snapshot instead of hanging forever.
+    setHydrated(true)
     return false
   }
 }
 
-export { user, permissions }
+export { user, permissions, hydrated }

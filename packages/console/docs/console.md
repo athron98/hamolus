@@ -180,22 +180,71 @@ Consequences for this package:
 ### Config (`/config`)
 
 Everything land-wide that isn't record data, on one screen (the old standalone
-`/settings` page was folded in here — `/settings` no longer exists):
+`/settings` page was folded in here — `/settings` no longer exists).
 
-- Full-screen JSON editor for the KV-backed settings blob
-  (`GET/PUT /_meta/settings`). Save merges top-level keys and persists to KV.
-- The public site uses `site.name`, `site.tagline`, `site.navigation` from here —
-  see [the settings reference](../../core/docs/settings.md).
+The screen holds **two unrelated stores**, and telling them apart is most of the work.
+Nothing on this page converts one into the other:
+
+| | Key/value entries | Settings blob |
+| --- | --- | --- |
+| Storage | D1 table `_configs` in the core | one KV object, `settings:{land}:{colony}:v1` |
+| API | `GET /api/_config`, `GET /api/_config/{key}`, `PUT /api/_config/{key}`, `DELETE /api/_config/{key}` | `GET /api/_meta/settings`, `PUT /api/_meta/settings` |
+| Shape | rows: `key`, `value` (any JSON), `land`, `colony`, `description`, `updatedAt` | one free-form JSON object, edited as a whole |
+| Permissions | `config.read` to see, `config.write` to change | `settings.read` to see, `settings.write` to change |
+| Write semantics | `PUT` **upserts** on `(land, colony, key)`; the key is matched case-insensitively | `PUT` is a **shallow top-level merge** |
+
+**Key/value entries.** A row belongs to a **colony**; there is no `scope` column and
+nothing to pick on save. The **filter** above the table narrows the view — All, a land
+(all of its colonies), or one colony — and the **New entry** form names the colony a row
+is written into. Both are built from the universe registry, so a session without
+`lands.read`/`colonies.read` gets no filter at all: the table then lists what the core
+already decided it can see, and a new entry lands in the session's own colony without
+asking.
+
+How far a session reaches follows the **scope** of its privilege, not the filter: a land
+admin sees its whole land and must name a colony to write into one; a colony admin sees
+only its own colony, and asking for a sibling is a `403` from the core rather than a
+silently narrowed list in the UI. Keys must match `^[a-z][a-z0-9._-]*$` (≤ 100 chars) per
+`configEntrySchema` in `@hamolus/types`; the form checks it live rather than waiting for
+a 400. A failed load shows the error and a **Retry** instead of an endless "Loading".
+
+**Nothing in the core interprets these rows.** There is no endpoint that turns a row into
+a page, and the generated site templates (`hamolus add site`) do not read `_configs` at
+all — they call `GET /api/{collection}` and take their title from their own layout props.
+The rows are a typed key/value store for your own app, agent or MCP server to read over
+the API; the land/colony split is the unit of storage, not a category.
+
+**Settings blob.** The conventional place for `site.name`, `site.tagline`,
+`site.navigation` — see [the settings reference](../../core/docs/settings.md) for the
+recommended shape. The console loads the blob on mount and edits what came back; an empty
+blob gets an **Insert an example** button rather than a prefilled editor, because a
+prefilled editor is how an unrelated `PUT` overwrites a real project. Save is disabled
+until the text differs from what is stored, and it adopts the **merged** response — a
+top-level key deleted in the editor comes back, since the core only adds and overwrites
+(there is no endpoint for deleting a single key — only for replacing the whole blob, so
+removing a key means rewriting it out-of-band or accepting the merge).
+Without `settings.write` the editor renders read-only instead of offering a save the core
+would reject. `GET /api/_meta/settings` is anonymous-readable while `PUBLIC_GETS=true`
+(`requireRead` only checks a session that exists), so a front end can fetch it without a
+token; sending a token that lacks `settings.read` is what turns it into a 403.
+
 - **Change password** panel (below the settings editor): self-service password
   update for the signed-in account via `POST /api/_auth/me/password` — current +
   new + confirmation fields, client-side validation (current required, ≥ 8 chars,
-  match check), the current session stays active after the change. Hidden for the
-  legacy admin-key session (`sub: 'admin'`), which has no password to change.
-- **Seed export/restore** — hidden for non-`settings.write` sessions. Export
-  (`scope` = all or one collection; media = rows-only or full R2 bytes) downloads a
-  `seed-{land}-{date}.json` snapshot of the active land; **Restore** prompts and then
-  POSTs it back to the core — `wipe=true` by default (safe because the core validates
-  the whole snapshot before touching anything). Activity is logged (media bytes
+  match check), the current session stays active after the change. Replaced by one
+  line of explanation for the legacy admin-key session (`id: 'admin'`, privilege
+  `admin`), which has no password to change — that session used to render an empty
+  card with no heading in it.
+
+### Seed (`/seed`)
+
+A separate screen in the **Environment** group, not part of `/config` (the route is
+gated on `settings.write`, so it is hidden entirely without it):
+
+- **Export** (`scope` = all or one collection; media = rows-only or full R2 bytes)
+  downloads a `seed-{land}-{date}.json` snapshot of the active land; **Restore** prompts
+  and then POSTs it back to the core — `wipe=true` by default (safe because the core
+  validates the whole snapshot before touching anything). Activity is logged (media bytes
   export can take a moment on large libraries — the button stays busy until done).
 - CLI equivalents in `packages/core/scripts/`: `dump-seed.mjs [scope] [media]` and
   `apply-seed.mjs <snapshot.json> [wipe]` (default `true`), both reading
