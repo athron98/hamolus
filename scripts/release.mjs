@@ -129,6 +129,16 @@ async function publish(requested) {
   console.log(`publishing ${version} from ${tag.slice(0, 8)}\n`)
 
   for (const name of ORDER) {
+    // A version is immutable, so a package that already carries this version is done —
+    // npm answers 403 and there is no way back. Skipping is what makes a publish that
+    // died halfway (a bad token, an expired OTP, a 0.2.6 that never landed) resumable
+    // instead of permanently stuck on the first entry.
+    const landed = spawnSync('npm', ['view', `${name}@${version}`, 'version'], { encoding: 'utf8' })
+    if (landed.status === 0 && landed.stdout.trim() === version) {
+      console.log(`=== ${name}@${version} === already published, skipping\n`)
+      continue
+    }
+
     console.log(`=== ${name}@${version} ===`)
     // Inherits the terminal, so npm's OTP prompt is a prompt and not a hang.
     const result = spawnSync('pnpm', ['-F', name, 'publish', '--no-git-checks'], { stdio: 'inherit' })
