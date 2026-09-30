@@ -216,11 +216,25 @@ The console is static assets and needs none of this. Nothing else is required �
 D1, KV and R2 are provisioned for you and documented in each repository's
 README.
 
-**The MCP worker needs no secret at all.** It has exactly two plain vars, committed
-to its own `wrangler.jsonc` because neither is confidential in the way a signing key
-is — `CORE_API_URL` and `MCP_INSTANCE_ID`, the instance id you create under
-**Environment → MCP** in the console. Callers authenticate with a per-user token
-issued in that same screen, revocable one at a time. See
+**The MCP worker needs no secret at all** — but it does need one step a button cannot
+do for you. It has exactly two plain vars in its own `wrangler.jsonc`, because neither
+is confidential in the way a signing key is:
+
+- `CORE_API_URL` — set it to your core, including `/api`. The template ships
+  `http://localhost:8787/api`, which is a placeholder, not a default.
+- `MCP_INSTANCE_ID` — **shipped empty on purpose.** An instance id is a credential, so
+  there is no guessable default to fall back on, and a worker that serves nothing until
+  you say so is better than one that serves something to whoever deploys it first.
+
+So a freshly forked MCP repo deploys and then refuses every request, saying it is not
+configured. That is the intended first state, not a broken build. To bring it up:
+
+1. Open the console against your core and create an instance under **Environment → MCP**.
+2. Set `MCP_INSTANCE_ID` to the id it gives you, and `CORE_API_URL` to your core.
+3. Issue a token under that instance and send it as `Authorization: Bearer <token>`.
+
+Callers authenticate with that per-user token, which is revocable one at a time — the
+thing a shared `MCP_BEARER_TOKEN` could never do. See
 [the MCP reference](packages/mcp/docs/mcp.md).
 
 ## Packages
