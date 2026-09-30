@@ -8,7 +8,105 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
-Nothing yet.
+## [0.2.10] — 2026-09-30
+
+### Added
+
+- **Console-managed MCP servers.** A deployed MCP server now needs a core URL and an
+  instance id and nothing else. Scope, enabled/read-only state, dynamic tools, the tool
+  surface and the caller policy all live in the core and change without a redeploy, from
+  **Environment → MCP**.
+
+  Previously a server needed `CORE_ADMIN_KEY`, which is platform-wide: an instance serving
+  one colony could reach all of them, and `MCP_READONLY` only narrowed what the worker
+  *offered*, not what the core *accepted*. Read-only is now a rule the core applies, via
+  the `MCP_GROUP_PERMISSIONS` mapping from an operator's declared tool groups to the
+  permission list the core itself checks.
+
+- **Per-user MCP tokens, issued from the console and revocable individually.** The
+  plaintext token is returned exactly once, at creation, and only its hash is stored. A
+  token can *narrow* its instance's permissions and can never widen them. A token is
+  scoped to one colony and belongs to one instance, and the instance id in the request
+  header is held against it.
+
+- **New permissions `mcp.read` and `mcp.write`,** separating who may see MCP
+  configuration from who may change it. A land admin must name a colony for a
+  single-instance read, the same as everywhere else.
+
+- **`GET /api/_mcp/config` and `POST /api/_mcp/session`,** mounted before the JWT and
+  scope middleware so a worker can call them using only its instance id. An unknown id
+  answers 401 rather than 404, so an agent re-authenticates instead of reporting a bug
+  in its own request; a revoked token and a wrong secret share a code and differ only in
+  the console-facing reason.
+
+- **`check:mcp-instance-acl`,** a 69-assertion gate that provisions two lands, three
+  colonies and four roles, then exercises the real HTTP surface: cross-colony refusal,
+  id collisions, token narrow/widen, read-only enforcement, revocation, disabled
+  instances, and that an MCP token is not a console session. It cleans up after itself.
+
+### Changed
+
+- **The MCP template and `hamolus add mcp` emit two variables,** `CORE_API_URL` and
+  `MCP_INSTANCE_ID`, and the instance id is left visibly empty rather than filled with a
+  guessable placeholder. The deprecated `CORE_ADMIN_KEY` / `MCP_BEARER_TOKEN` path still
+  works, and `GET /` on the worker reports `mode: "legacy"` and warns.
+
+### Fixed
+
+- **A token could be redeemed through the wrong instance.** `verifyMcpToken` resolved the
+  token to its own instance without checking that against the instance id in the request
+  header, so any worker in any colony could present a valid instance id and exchange
+  another deployment's token — receiving a session scoped to a colony it has no business
+  reaching, with its own id looking legitimate in every log along the way. The header id
+  is now an assertion the core holds against the token.
+
+- **MCP instance and token ids are unique globally.** They are high-entropy and are used
+  as the lookup key, so a per-colony primary key let `WHERE id = ?` resolve to an
+  arbitrary match and hand one colony's session to another's worker.
+
+- **Missing, unknown and revoked MCP credentials answer 401, and a disabled instance
+  answers 403** with a code the console can act on, instead of a 400 that reads as a bug
+  in the caller's request.
+
+- **A read-only MCP instance no longer advertises write tools.** `tools/list` returned
+  `create_record`, `update_record`, `delete_record` and friends on a read-only instance;
+  the core refused them on call, so nothing was writable — but an agent reads the tool
+  list to decide what it can do, and a list of tools that all fail wastes the turn and
+  teaches the model to retry refusals. It was also inconsistent inside the package: the
+  per-collection dynamic tools already disappeared when read-only, so the same
+  instance hid `create_record` for a dynamic collection while advertising the static
+  one. Write tools are now not registered at all, detected by the same `runWrite` wrapper
+  that enforces the refusal, so the two cannot drift. The core remains the boundary.
+
+- **A disabled or revoked instance now says so over MCP.** `createMcpHandler` catches
+  whatever its factory throws and reports a generic JSON-RPC `-32603 Internal server
+  error`, so the `catch` written to pass the core's wording through never ran. A
+  switched-off instance, a revoked token and a stale instance id all reached the client
+  as the same nameless failure. The config and token exchange now resolve before the SDK
+  handler is involved, and the caller gets `FORBIDDEN` — "This MCP instance is disabled".
+
+- **A disabled MCP instance is no longer drawn in the same neutral as a `Read/write`
+  one.** Both used the dim pill, so a server that refuses every request looked ordinary
+  in the table and the word had to be read to notice. "Not serving" is the one fact this
+  table exists to show, so it now gets the danger tone plus a strike-through — a
+  structural difference that survives a colour-blind reader and a greyscale screenshot.
+
+- **`packages/mcp/wrangler.jsonc` no longer advertises the old secret arrangement.**
+  It still documented `CORE_ADMIN_KEY` and `MCP_BEARER_TOKEN` and carried no
+  `MCP_INSTANCE_ID`, so the "Deploy to Cloudflare" copies exported from it shipped a
+  setup that could not reach the managed path at all. Its vars are now the same two the
+  template emits.
+
+- **The console's copy-paste block quotes the core URL it is actually talking to.**
+  It said `https://your-core.example.com/api`, whose failure surfaces as a 404 from the
+  new worker minutes later. An empty `apiBase()` — console served from the core — now
+  resolves to the current origin plus `/api`.
+
+- **The instance create body no longer accepts `land`/`colony`.** The route resolved the
+  instance's colony from the query and the session's privilege; the schema also accepted
+  the same two fields in the body, so one fact had two sources and a caller sending both
+  got whichever the route happened to read. They remain in the response, because the
+  console has to show which colony a row belongs to.
 
 ## [0.2.9] — 2026-09-29
 
