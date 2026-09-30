@@ -37,6 +37,12 @@ import type {
   MediaTaxonomyDetail,
   MediaUpdate,
   MediaUploadMeta,
+  McpInstance,
+  McpInstanceCreateInput,
+  McpInstanceUpdateInput,
+  McpToken,
+  McpTokenCreateInput,
+  McpTokenCreated,
   PanelDefinition,
   Permission,
   ResolvedLocalization,
@@ -577,6 +583,81 @@ export const api = {
 
   deleteSuper(id: string): Promise<null> {
     return request(`/_auth/supers/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+
+  // ---- MCP (console-managed: an instance's whole configuration lives in the core) ----
+  //
+  // Every call here targets the instance's colony, so each one carries `?land=`/
+  // `?colony=`. As on `/_config` those are a *request* for a scope the session may
+  // already own, never a grant: the core resolves them against the caller's privilege
+  // and rejects a target it does not. Omit `target` to address the active endpoint's
+  // scope, which is what the nav page does.
+
+  listMcpInstances(target?: ConfigTarget): Promise<{ data: McpInstance[] }> {
+    return request(`/_mcp/instances${toQuery({ land: target?.land, colony: target?.colony })}`)
+  },
+
+  getMcpInstance(id: string, target?: ConfigTarget): Promise<ItemResponse<McpInstance>> {
+    return request(
+      `/_mcp/instances/${encodeURIComponent(id)}${toQuery({ land: target?.land, colony: target?.colony })}`,
+    )
+  },
+
+  createMcpInstance(
+    input: McpInstanceCreateInput,
+    target?: ConfigTarget,
+  ): Promise<ItemResponse<McpInstance>> {
+    return request(`/_mcp/instances${toQuery({ land: target?.land, colony: target?.colony })}`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  },
+
+  updateMcpInstance(
+    id: string,
+    input: McpInstanceUpdateInput,
+    target?: ConfigTarget,
+  ): Promise<ItemResponse<McpInstance>> {
+    return request(
+      `/_mcp/instances/${encodeURIComponent(id)}${toQuery({ land: target?.land, colony: target?.colony })}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+    )
+  },
+
+  deleteMcpInstance(id: string, target?: ConfigTarget): Promise<null> {
+    return request(
+      `/_mcp/instances/${encodeURIComponent(id)}${toQuery({ land: target?.land, colony: target?.colony })}`,
+      { method: 'DELETE' },
+    )
+  },
+
+  listMcpTokens(id: string, target?: ConfigTarget): Promise<{ data: McpToken[] }> {
+    return request(
+      `/_mcp/instances/${encodeURIComponent(id)}/tokens${toQuery({ land: target?.land, colony: target?.colony })}`,
+    )
+  },
+
+  /**
+   * Issue a token. The plaintext in the response is the only copy that will ever
+   * exist — the core keeps only its hash — so the caller has to show it before
+   * discarding the response.
+   */
+  createMcpToken(
+    id: string,
+    input: McpTokenCreateInput,
+    target?: ConfigTarget,
+  ): Promise<ItemResponse<McpTokenCreated>> {
+    return request(
+      `/_mcp/instances/${encodeURIComponent(id)}/tokens${toQuery({ land: target?.land, colony: target?.colony })}`,
+      { method: 'POST', body: JSON.stringify(input) },
+    )
+  },
+
+  revokeMcpToken(tokenId: string, target?: ConfigTarget): Promise<{ data: McpToken }> {
+    return request(
+      `/_mcp/tokens/${encodeURIComponent(tokenId)}${toQuery({ land: target?.land, colony: target?.colony })}`,
+      { method: 'DELETE' },
+    )
   },
 
   // ---- seed (inverse generator — export/apply full state snapshots) ----

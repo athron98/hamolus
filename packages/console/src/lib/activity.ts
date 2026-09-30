@@ -48,6 +48,11 @@ export type ActivityType =
   | 'panel.create'
   | 'panel.update'
   | 'panel.delete'
+  | 'mcp.instance.create'
+  | 'mcp.instance.update'
+  | 'mcp.instance.delete'
+  | 'mcp.token.create'
+  | 'mcp.token.revoke'
 
 export interface ActivityEntry {
   id: string

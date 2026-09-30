@@ -207,16 +207,21 @@ the first deploy, put them on the Worker from the repository it forked into
 (`core/`, `mcp/` respectively):
 
 ```bash
+# core
 wrangler secret put JWT_SECRET
 wrangler secret put ADMIN_KEY
-# mcp additionally needs to know its core:
-wrangler secret put CORE_ADMIN_KEY
-wrangler secret put CORE_API_URL    # e.g. https://core.<your-subdomain>.workers.dev
 ```
 
 The console is static assets and needs none of this. Nothing else is required —
 D1, KV and R2 are provisioned for you and documented in each repository's
 README.
+
+**The MCP worker needs no secret at all.** It has exactly two plain vars, committed
+to its own `wrangler.jsonc` because neither is confidential in the way a signing key
+is — `CORE_API_URL` and `MCP_INSTANCE_ID`, the instance id you create under
+**Environment → MCP** in the console. Callers authenticate with a per-user token
+issued in that same screen, revocable one at a time. See
+[the MCP reference](packages/mcp/docs/mcp.md).
 
 ## Packages
 
@@ -247,6 +252,7 @@ pnpm check:generated-app      # generates a project, installs it, typechecks + b
 pnpm check:code-definitions   # offline gate for code-defined collections/panels
 pnpm check:code-defined-core  # the same contract over HTTP (needs a generated core)
 pnpm check:panel-acl          # live panel ACL gate (needs a running core)
+pnpm check:mcp-instance-acl   # live MCP instance/token ACL gate (needs a running core)
 pnpm check:scope-colony-resolution
 ```
 

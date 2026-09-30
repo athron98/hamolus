@@ -70,6 +70,11 @@ const ACTIVITY_LABEL: Record<ActivityType, string> = {
   'panel.create': 'Created panel',
   'panel.update': 'Updated panel',
   'panel.delete': 'Deleted panel',
+  'mcp.instance.create': 'Created MCP instance',
+  'mcp.instance.update': 'Updated MCP instance',
+  'mcp.instance.delete': 'Deleted MCP instance',
+  'mcp.token.create': 'Issued MCP token',
+  'mcp.token.revoke': 'Revoked MCP token',
 }
 
 function timeAgo(iso: string): string {

@@ -82,6 +82,7 @@ pnpm check:generated-app       # generate → install → typecheck → build a 
 pnpm check:code-definitions    # offline gate for code-defined collections/panels
 pnpm check:code-defined-core   # the same contract over HTTP (needs a generated core)
 pnpm check:panel-acl           # live panel ACL gate (needs a running core)
+pnpm check:mcp-instance-acl    # live MCP instance/token ACL gate (needs a running core)
 pnpm check:scope-colony-resolution
 ```
 

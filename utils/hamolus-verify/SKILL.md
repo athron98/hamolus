@@ -1,6 +1,6 @@
 ---
 name: hamolus-verify
-description: Use ONLY when deciding which Hamolus checks/gates to run after a change, or when a gate failed. Separates offline gates from live gates needing a running core, lists the root 'pnpm check:*' names and the deploy-repository drift gate, and states which failures are environmental. Front-load keywords: pnpm check, gate, typecheck, build, check:code-definitions, check:panel-acl, deploy repos, export-deploy-repo, verify.
+description: Use ONLY when deciding which Hamolus checks/gates to run after a change, or when a gate failed. Separates offline gates from live gates needing a running core, lists the root 'pnpm check:*' names and the deploy-repository drift gate, and states which failures are environmental. Front-load keywords: pnpm check, gate, typecheck, build, check:code-definitions, check:panel-acl, check:mcp-instance-acl, deploy repos, export-deploy-repo, verify.
 ---
 
 # Hamolus — Verify
@@ -61,6 +61,7 @@ against the monorepo's own `wrangler.jsonc` is the wrong comparison.
 pnpm -F @hamolus/core dev        # in another terminal
 
 pnpm check:panel-acl             # panel ACL over HTTP
+pnpm check:mcp-instance-acl      # MCP instance/token/machine-config ACL over HTTP
 pnpm check:scope-colony-resolution
 pnpm check:localization-api
 pnpm check:code-defined-core     # generated predefined core (cli)
@@ -75,6 +76,7 @@ These are **not broken** when they fail on a laptop without a running core or a 
 | ------- | --- |
 | A field type or collection schema | `typecheck`, `build`, `check:code-definitions`, `check:panel-runtime`, `check:panel-acl` |
 | A panel manifest | `check:code-definitions`, `check:panel-acl`, `check:panel-runtime` |
+| An MCP instance, token, tool group or `packages/mcp` | `check:mcp-instance-acl`, `typecheck`, `build`, `check:generated-app` |
 | `core.config.ts` / localization | `check:localization`, `check:localization-api` |
 | `console.config.ts` / plugins | `check:plugin-config` (via `-F @hamolus/cli`), `check:markers`, `check:generated-app` |
 | A template | `check:markers`, `check:generated-app`, `typecheck`, `build` |
@@ -88,6 +90,7 @@ These are **not broken** when they fail on a laptop without a running core or a 
 - **Live gates fail identically on a clean tree** → environmental (no core / cold store), not a regression. Verify on a clean checkout before claiming a regression.
 - **`check:generated-app` is slow** (installs + builds a generated console). Build `@hamolus/console` (`build:lib`) first or it exercises a stale library.
 - **Copyright gate is exact-match**, not a heuristic: copy the header verbatim.
+- **`check:mcp-instance-acl` needs a core on `:8787` with the routes mounted.** A `fetch failed` / `ECONNREFUSED 127.0.0.1:8787` is environmental. The gate creates and deletes its own instances and tokens; it is self-cleaning, so a failure mid-run leaves no rows behind.
 
 ## Reporting
 

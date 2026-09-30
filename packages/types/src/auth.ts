@@ -18,6 +18,8 @@ export const PERMISSIONS = [
   'users.write',
   'config.read',
   'config.write',
+  'mcp.read',
+  'mcp.write',
   'settings.read',
   'settings.write',
   'collections.read',
@@ -89,6 +91,7 @@ export const PRIVILEGE_SEEDS: Privilege[] = [
           ![
             'users.write',
             'config.write',
+            'mcp.write',
             'lands.read',
             'lands.write',
             'colonies.read',
@@ -170,6 +173,12 @@ export interface AuthTokenPayload {
   land?: string
   /** Colony this token is confined to. */
   colony?: string
+  /**
+   * Set when the session was minted for an MCP instance rather than a console
+   * login. Purely for attribution — the permission list is what is enforced, and
+   * it is already narrowed by the instance's tool groups.
+   */
+  mcp?: { instanceId: string; tokenId: string }
   iat?: number
   exp?: number
 }

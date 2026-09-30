@@ -34,6 +34,7 @@ import AttachmentsPage from './pages/AttachmentsPage'
 import { UsersPage } from './pages/Users'
 import { ConfigPage } from './pages/Config'
 import { UniversePage } from './pages/Universe'
+import { McpPage } from './pages/Mcp'
 import { SeedPage } from './pages/Seed'
 import { PluginsPage } from './pages/Plugins'
 import { PluginPage } from './pages/PluginPage'
@@ -79,6 +80,7 @@ function routes(): JSX.Element {
       <Route path="/users" component={UsersPage} />
       <Route path="/config" component={ConfigPage} />
       <Route path="/universe" component={UniversePage} />
+      <Route path="/mcp" component={McpPage} />
       <Route path="/seed" component={SeedPage} />
       <Route path="/plugins" component={PluginsPage} />
       <Route path="/plugins/:name" component={PluginPage} />

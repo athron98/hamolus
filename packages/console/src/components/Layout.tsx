@@ -63,6 +63,7 @@ import {
   SunIcon,
   UsersIcon,
   XIcon,
+  ZapIcon,
 } from './Icons'
 
 function contrastOn(hex: string): string {
@@ -1176,6 +1177,11 @@ export function Layout(props: { children?: JSX.Element }) {
     }
     if (hasPermission('config.read')) {
       m.push({ id: 'config', href: '/config', title: 'Configuration', label: 'Config', icon: <BracesIcon size={15} /> })
+    }
+    if (hasPermission('mcp.read')) {
+      // MCP sits next to Config on purpose: both configure a *deployment* of this
+      // core, and both are read at request time rather than baked into a redeploy.
+      m.push({ id: 'mcp', href: '/mcp', title: 'MCP', label: 'MCP', icon: <ZapIcon size={15} /> })
     }
     if (hasPermission('users.read')) {
       m.push({ id: 'users', href: '/users', title: 'Users', label: 'Users', icon: <UsersIcon size={15} /> })

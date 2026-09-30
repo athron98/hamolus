@@ -62,6 +62,7 @@ section of prose.
 | `pnpm check:localization` | — | localized fields, per-locale resolution, generated config validity |
 | `pnpm check:panel-runtime` | — | the panel client against a fake core |
 | `pnpm check:panel-acl` | a running core on `:8787` | panel ACL enforcement over HTTP |
+| `pnpm check:mcp-instance-acl` | a running core | MCP instance, token and machine-config enforcement over HTTP |
 | `pnpm check:scope-colony-resolution` | a running core | land/colony scope resolution over HTTP |
 | `pnpm check:localization-api` | a running core | locale negotiation on real endpoints |
 | `pnpm check:code-defined-core` | a generated `predefined` core | code-defined collections and panels serve and stay frozen |

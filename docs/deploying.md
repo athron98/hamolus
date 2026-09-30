@@ -144,19 +144,39 @@ pnpm -F @hamolus/mcp build
 pnpm -F @hamolus/mcp deploy
 ```
 
-Configure the URL, credentials and (optional) land through the variables in
-[the MCP reference](../packages/mcp/docs/mcp.md). For an open deployment put an
-`MCP_BEARER_TOKEN` in front of it.
+There are **no secrets to set**. Two plain vars go in `wrangler.jsonc`, which the
+template already carries:
+
+| Var | Where it comes from |
+| --- | --- |
+| `CORE_API_URL` | the core you just deployed, including `/api` |
+| `MCP_INSTANCE_ID` | the instance id from **Environment → MCP** in the console |
+
+Everything else — the colony it serves, enabled, read-only, tool groups, dynamic
+collections — is per-instance configuration in the core, so it is changed in the console
+and takes effect without a redeploy. Then give the caller a **token**: issue one under
+the instance in the console and send it as `Authorization: Bearer <token>`. Tokens are
+stored hashed, shown once, and revocable individually, which is how you remove one
+person's access without touching anyone else's.
+
+An MCP server is **never** meant to be open. An instance with no token holder is
+effectively an unauthenticated reader of one colony.
+
+Migrating a deployment that predates this: set `MCP_INSTANCE_ID`, deploy, confirm
+`GET /` reports `mode: "console-managed"`, then delete the `CORE_ADMIN_KEY` and
+`MCP_BEARER_TOKEN` secrets. The old path keeps working until `MCP_INSTANCE_ID` is set,
+so there is no outage. Full reference: [the MCP server](../packages/mcp/docs/mcp.md).
 
 ## Post-deploy checks
 
 ```bash
 pnpm check:scope-colony-resolution
 pnpm check:panel-acl            # needs a running core
+pnpm check:mcp-instance-acl     # needs a running core
 pnpm check:code-defined-core    # needs a core generated from the basic template
 ```
 
-Both target the local core by default; point them at a deployment with `BASE=` and
+All target the local core by default; point them at a deployment with `BASE=` and
 `ADMIN_KEY=` (see `packages/core/scripts/check-*.mjs`). `check:code-defined-core` refuses a
 non-loopback `BASE` on purpose — it registers and deletes a land, a colony and a collection.
 

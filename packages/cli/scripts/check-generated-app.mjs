@@ -644,13 +644,12 @@ try {
   }
 
   // "Everything is wired, so `pnpm dev` needs no manual step" is a promise this suite is in
-  // a position to check, and the MCP server was quietly breaking it. The server authenticates
-  // to the core with `CORE_API_TOKEN` or `CORE_ADMIN_KEY`; neither was set, so every tool call
-  // failed with "No CORE_API_TOKEN or CORE_ADMIN_KEY configured for the MCP server." The
-  // giveaway is that the server still starts and still answers `GET /` with 200, so nothing
-  // in the startup output is wrong — and the hint that used to explain it said to copy
-  // `.env.example` over `.dev.vars`, which replaced a working `CORE_API_URL` with a
-  // placeholder for a deployed core.
+  // a position to check. The MCP server used to break it by holding the core's
+  // `ADMIN_KEY`; it now holds an instance id instead, and the instance is something only a
+  // person who has opened the console can have. So the guarantee has moved: the generated
+  // `.dev.vars` must point the server at the core it was generated next to, must leave the
+  // instance id visibly empty rather than inventing one, and must not tell anyone to copy a
+  // file over the top of it.
   {
     const withMcp = join(root, 'mcp-wired')
     const created = hamolus(root, [
@@ -662,7 +661,7 @@ try {
 
     const mcpVars = join(withMcp, 'mcp', '.dev.vars')
     ok(
-      'the MCP server gets a .dev.vars with a key, so no file has to be copied by hand',
+      'the MCP server gets a .dev.vars pointing at the core, so no file has to be copied by hand',
       existsSync(mcpVars),
       'mcp/.dev.vars',
     )
@@ -676,17 +675,67 @@ try {
         }
         return undefined
       }
-      const coreKey = readVar(join(withMcp, 'core', '.dev.vars'), 'ADMIN_KEY')
-      const mcpKey = readVar(mcpVars, 'CORE_ADMIN_KEY')
+      const mcpText = readFileSync(mcpVars, 'utf8')
+      const coreUrl = readVar(mcpVars, 'CORE_API_URL')
       ok(
-        'the MCP server is handed the core\'s own admin key',
-        Boolean(coreKey) && mcpKey === coreKey,
-        `core=${coreKey ? 'set' : 'missing'} mcp=${mcpKey ? 'set' : 'missing'}`,
+        'the MCP server is pointed at the core it was generated next to',
+        Boolean(coreUrl) && /^http:\/\/[^:]+:8787\/api$/.test(coreUrl),
+        `CORE_API_URL=${coreUrl ?? 'missing'} (expected a dev core on :8787 with the /api suffix)`,
+      )
+      // Blank is the honest state. A generated placeholder would invite someone to type
+      // something guessable into a value the core treats as a credential.
+      //
+      // Assert the value is the empty string, not that the key is absent. `readVar`
+      // returns `undefined` for a missing key and `''` for a present-but-empty one, and
+      // only the second is "visibly empty" — the operator can see the key is expected of
+      // them. A key that is not there at all is a different failure, and a
+      // `=== undefined` assertion would have quietly blessed it.
+      ok(
+        'the instance id is left visibly empty, not filled with a guessable placeholder',
+        readVar(mcpVars, 'MCP_INSTANCE_ID') === '',
+        `MCP_INSTANCE_ID=${JSON.stringify(readVar(mcpVars, 'MCP_INSTANCE_ID'))} (expected the key to be present and empty; it is created in the console, so nothing can know it ahead of time)`,
       )
       ok(
-        'the MCP key is not written into the committed wrangler.jsonc',
-        !/"CORE_ADMIN_KEY"\s*:/.test(readFileSync(join(withMcp, 'mcp', 'wrangler.jsonc'), 'utf8')),
-        'a secret in `vars` is committed, and a secret and a var can never share a name',
+        'the generated .dev.vars carries no admin key at all',
+        !/ADMIN_KEY|API_TOKEN/.test(mcpText),
+        'a platform-wide key in every generated server is what this model replaced',
+      )
+      const wranglerText = readFileSync(join(withMcp, 'mcp', 'wrangler.jsonc'), 'utf8')
+      // Read the *vars block*, not the file.
+      //
+      // A flat regex over the whole file cannot tell a setting from a mention, and this
+      // one has to: the template explains how to migrate off the old model, so it names
+      // `CORE_ADMIN_KEY` and `MCP_BEARER_TOKEN` in prose. Matching those would fail on
+      // exactly the file that documents the migration best — and, worse, the blunt fix
+      // of deleting the migration note would trade a real usability loss for a green
+      // check. The claim is about what a deployment has to set, so assert on the block
+      // the deployment actually reads.
+      const varsBlock = (() => {
+        const start = wranglerText.indexOf('"vars"')
+        if (start === -1) return ''
+        const open = wranglerText.indexOf('{', start)
+        let depth = 0
+        for (let i = open; i < wranglerText.length; i += 1) {
+          if (wranglerText[i] === '{') depth += 1
+          if (wranglerText[i] === '}') {
+            depth -= 1
+            if (depth === 0) return wranglerText.slice(open, i + 1)
+          }
+        }
+        return ''
+      })()
+      const varKeys = [...varsBlock.matchAll(/"([A-Z0-9_]+)"\s*:/g)].map((m) => m[1])
+      ok(
+        'the committed wrangler.jsonc holds exactly the two documented vars',
+        varKeys.length === 2 && varKeys.includes('CORE_API_URL') && varKeys.includes('MCP_INSTANCE_ID'),
+        `vars keys=[${varKeys.join(',')}] (a deployment should need no editing beyond those two values)`,
+      )
+      // Separate from the key list, so a regression that adds a secret var still reports
+      // itself in words an operator can act on, rather than only as a key count.
+      ok(
+        'no legacy credential or policy var survives in the vars block',
+        !varsBlock.replace(/\/\/.*$/gm, '').match(/ADMIN_KEY|API_TOKEN|BEARER_TOKEN|READONLY|TOOL_GROUPS|DYNAMIC/),
+        `vars=${varsBlock.replace(/\s+/g, ' ').slice(0, 200)}`,
       )
       ok(
         'the project .gitignore covers mcp/.dev.vars',
@@ -694,24 +743,27 @@ try {
       )
     }
 
-    // A core-less project must not get one. Its core runs somewhere else, and a key the CLI
-    // did not generate is not something to invent.
+    // A core-less project gets no invented URL either. Its core runs somewhere else, and
+    // an address the CLI made up would point the server at a port nothing is listening on.
     const noCoreMcp = join(root, 'mcp-no-core')
     hamolus(root, ['create', 'remote', '--link', REPO, '-o', noCoreMcp, '-y', '--no-core', '--mcp'])
     ok(
-      'a core-less MCP server gets no invented key',
+      'a core-less MCP server gets no invented core URL',
       !existsSync(join(noCoreMcp, 'mcp', '.dev.vars')),
       'mcp/.dev.vars',
     )
 
-    // `MCP_BEARER_TOKEN` is a different token pointing the other way: it authenticates
-    // callers to `/mcp`. Telling someone to set it is how a project ends up with an mcp
-    // server that still cannot reach its own core.
+    // The next step has to name the console, or the empty instance id is just an obstacle.
     const envExample = readFileSync(join(withMcp, 'mcp', '.env.example'), 'utf8')
     ok(
-      'the MCP .env.example names the variable the server actually reads',
-      /CORE_ADMIN_KEY|CORE_API_TOKEN/.test(envExample),
-      'CORE_ADMIN_KEY or CORE_API_TOKEN is what authenticates the server to the core',
+      'the MCP .env.example names the two variables the server actually reads',
+      /MCP_INSTANCE_ID/.test(envExample) && /CORE_API_URL/.test(envExample),
+      'CORE_API_URL and MCP_INSTANCE_ID are the whole configuration surface',
+    )
+    ok(
+      'the MCP .env.example points at the console as where the rest is configured',
+      /console/i.test(envExample),
+      'an empty instance id has to say who fills it in',
     )
   }
 

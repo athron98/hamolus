@@ -350,6 +350,18 @@ export const CalendarIcon = (props: IconProps) =>
 export const ZapIcon = (props: IconProps) =>
   svg(props, <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />)
 
+/** A key, for per-caller credentials — a token is someone's, not the instance's. */
+export const KeyIcon = (props: IconProps) =>
+  svg(
+    props,
+    <>
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="M10.7 12.3 21 2" />
+      <path d="M17 6l3 3" />
+      <path d="M14 9l3 3" />
+    </>,
+  )
+
 export const LayoutDashboardIcon = (props: IconProps) =>
   svg(
     props,

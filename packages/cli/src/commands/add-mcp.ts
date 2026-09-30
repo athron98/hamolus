@@ -12,15 +12,23 @@
  * The MCP server is a thin, stateless Cloudflare Worker that proxies the core API
  * as Model Context Protocol tools, so an agent (opencode, Claude, …) can read and
  * write a project's data. Generated separately from the core because an MCP server
- * is a *deployment decision*: teams often run it, some never do, and it holds its
- * own token.
+ * is a *deployment decision*: teams often run it, some never do.
+ *
+ * What it authenticates with is the part worth knowing. It used to hold the core's
+ * `ADMIN_KEY` — platform-wide, every land and colony, with "read only" a promise the
+ * worker made rather than a rule the core enforced. Now it holds an *instance id*:
+ * a handle to one configured instance whose scope, write access and tool groups live
+ * in the core, and whose callers present per-user tokens the console issued. The
+ * generated server therefore ships two variables and no secrets, and a deployment
+ * that wants a different scope, a different tool set, or a different set of callers
+ * changes that in the console instead of redeploying.
  *
  * Generated from `templates/mcps/basic`, exactly like a core: the part is a small
  * seam that depends on `@hamolus/mcp` rather than a vendored copy of its source, so
  * upgrading the package upgrades the tool surface of every generated server.
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { ParsedArgs } from '../args.js'
 import { formatLabel, resolveTemplateDirectory } from '../templates.js'
@@ -52,6 +60,9 @@ import {
  */
 export const MCP_DEV_PORT = 8788
 
+/** The port `wrangler dev` serves a core on. */
+const CORE_DEV_PORT = 8787
+
 /**
  * Tokens for `templates/mcps/basic`.
  *
@@ -74,44 +85,41 @@ function mcpTokens(project: { name: string; scope: string; devHost?: string }): 
 }
 
 /**
- * Give the MCP server a working key, so `pnpm dev` authenticates with no manual step.
+ * Write `mcp/.dev.vars`, so `pnpm dev` boots with a reachable core and a clear next step.
  *
- * The MCP server reaches the core over HTTP with a bearer token, and `packages/mcp` mints
- * one from `CORE_ADMIN_KEY` when `CORE_API_TOKEN` is unset. Left unset, the server still
- * boots and still answers `GET /` with 200, so it looks healthy — and then every single tool
- * call fails with "No CORE_API_TOKEN or CORE_ADMIN_KEY configured for the MCP server." That
- * is the worst shape of failure: nothing in the startup output is wrong, and the message
- * blames a configuration the person never knew existed.
+ * There is no longer a secret to wire. The server authenticates to the core with an
+ * *instance id*, not a key, and every decision that key used to imply — which land and
+ * colony, read-only or not, which tool groups, who may call it — now lives in the core
+ * and is edited from the console. So the file written here is deliberately boring:
  *
- * When the project has its own core, the wizard already generated that core's `ADMIN_KEY`,
- * so handing the same value to the MCP server is not a new secret — it is the one key that
- * was generated a moment earlier. It goes in `mcp/.dev.vars` rather than in `wrangler.jsonc`
- * `vars` for two reasons: `vars` is committed, and a secret and a var can never share a name
- * in one config. `*.dev.vars` is git-ignored by the project's own `.gitignore`, and Wrangler
- * resolves `.dev.vars` relative to the config it sits next to — which is why this is
- * `mcp/.dev.vars` and not a copy of the core's file.
+ *   CORE_API_URL     where the core is
+ *   MCP_INSTANCE_ID  blank, because only a person who has opened the console can know it
  *
- * A core-less project gets nothing: its core runs somewhere else, and the key for a core
- * this CLI did not generate is not something to invent. The hint says what to fill in.
+ * The blank id is the honest state, not a placeholder to fill in blindly. With it unset
+ * the server still boots and still answers `GET /` with 200, so it looks healthy — and
+ * then `POST /mcp` refuses every call with "this MCP server is console-managed, send a
+ * token". That message names the fix, which is why there is nothing else to write.
  *
- * @returns true when a key was wired, false when the project has no core key to share.
+ * @param coreUrl the core's `/api` base, when the project has a core of its own.
+ * @returns true when a core URL was written, false for a core-less project.
  */
-export function wireMcpDevVars(projectRoot: string, key: string | undefined): boolean {
-  if (!key) return false
+export function wireMcpDevVars(projectRoot: string, coreUrl: string | undefined): boolean {
+  if (!coreUrl) return false
   const destination = join(projectRoot, 'mcp', '.dev.vars')
   writeFileSync(
     destination,
     [
-      '# Local development secrets for the MCP server.',
+      '# Local development settings for the MCP server.',
       '#',
-      '# Written by `hamolus` when the MCP server was added. It holds the same ADMIN_KEY as',
-      '# core/.dev.vars, so the server can mint a token on startup and every tool call works',
-      '# without anyone copying a file or pasting a key. Both files are git-ignored.',
-      '#',
-      '# This is a *local* key. A deployed MCP server needs its own, set with',
-      '# `wrangler secret put` — see the mcp README.',
+      '# Written by `hamolus` when the MCP server was added. Git-ignored.',
       '',
-      `CORE_ADMIN_KEY=${key}`,
+      `CORE_API_URL=${coreUrl}`,
+      '',
+      '# Create the instance in the console (Environment -> MCP) and paste its id here.',
+      '# Nothing else needs configuring: the console owns the scope, the read-only',
+      '# switch, the tool groups and the tokens, and the server picks up changes to',
+      '# them without a redeploy.',
+      'MCP_INSTANCE_ID=',
       '',
     ].join('\n'),
     'utf8',
@@ -119,17 +127,16 @@ export function wireMcpDevVars(projectRoot: string, key: string | undefined): bo
   return true
 }
 
-/** Read one `KEY=value` out of a core `.dev.vars`, ignoring comments and blank lines. */
-function readDevVar(path: string, name: string): string | undefined {
-  if (!existsSync(path)) return undefined
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
-    const trimmed = line.trim()
-    if (trimmed === '' || trimmed.startsWith('#')) continue
-    if (!trimmed.startsWith(`${name}=`)) continue
-    const value = trimmed.slice(name.length + 1).trim()
-    return value === '' ? undefined : value
-  }
-  return undefined
+/**
+ * The core URL a generated MCP server reads in development.
+ *
+ * `0.0.0.0` is a bind address, not a destination: handed to a `fetch`, it is rejected
+ * on some systems and the failure looks like the core being down. The wildcard becomes
+ * `localhost` — the same substitution the generated site makes, and for the same reason.
+ */
+export function coreApiUrl(devHost: string | undefined): string {
+  const host = devHost && devHost !== '0.0.0.0' && devHost !== '::' ? devHost : 'localhost'
+  return `http://${host}:${CORE_DEV_PORT}/api`
 }
 
 export async function runAddMcp(args: ParsedArgs): Promise<void> {
@@ -170,19 +177,15 @@ export async function runAddMcp(args: ParsedArgs): Promise<void> {
     info('added `mcp` to pnpm-workspace.yaml')
   }
 
-  // A project that already has a core shares its key; one that does not needs its own, and
-  // is told so in the hint rather than left to discover it from a failing tool call.
-  // `mode` is what a project with no core does not have, so it is the signal that there is
-  // no local key to share. A core-less project points at somebody else's core, and inventing
-  // a key for it would be worse than saying so.
+  // A project that already has a core shares its development URL; one that does not is
+  // told exactly which two lines to write, because inventing a core's address for it
+  // would be worse than saying so. `mode` is the signal that there is no local core to
+  // point at — a core-less project uses somebody else's.
   const wired = context.project.mode
-    ? wireMcpDevVars(
-        context.projectRoot,
-        readDevVar(join(context.projectRoot, 'core', '.dev.vars'), 'ADMIN_KEY'),
-      )
+    ? wireMcpDevVars(context.projectRoot, coreApiUrl(context.project.devHost))
     : false
 
-  warn('Keep MCP_BEARER_TOKEN set and prefer a scoped user token over the admin key.')
+  warn('The MCP server takes its whole configuration from the console. There is no key to set here.')
 
   await commit(
     context,
@@ -198,14 +201,20 @@ export async function runAddMcp(args: ParsedArgs): Promise<void> {
         // *deployed* core — so that instruction replaced a working value with a
         // placeholder and then asked for a key on top.
         ...(wired
-          ? ['pnpm dev                     # the MCP server and the core, on :8788 and :8787']
+          ? [
+              'pnpm dev                     # the MCP server and the core, on :8788 and :8787',
+              '',
+              'Then, in the console: Environment -> MCP -> create an instance, and copy its id',
+              'into MCP_INSTANCE_ID in mcp/.dev.vars. Issue a token there and send it to the',
+              'agent as `Authorization: Bearer <token>`.',
+            ]
           : [
               'pnpm dev                     # the MCP server and the core, on :8788 and :8787',
               '',
               'This project has no core of its own, so mcp/.dev.vars was not written.',
-              'Point it at your core and give it a key:',
-              '  echo "CORE_API_URL=https://<your-core>/api" > mcp/.dev.vars',
-              '  echo "CORE_ADMIN_KEY=<your-core ADMIN_KEY>"        >> mcp/.dev.vars',
+              'Point the server at your core in two lines:',
+              `  echo "CORE_API_URL=https://<your-core>/api" > mcp/.dev.vars`,
+              `  echo "MCP_INSTANCE_ID=<id from the console>"     >> mcp/.dev.vars`,
             ]),
       ],
     },

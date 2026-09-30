@@ -9,6 +9,7 @@
  */
 
 export * from './auth'
+export * from './mcp'
 export * from './scope'
 export * from './field'
 export * from './localization'

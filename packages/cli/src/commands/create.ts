@@ -452,7 +452,7 @@ A part generated on its own — a console, an MCP server, a panel, a site — ta
 that already runs somewhere else, and each one is told where at runtime:
 
   console   asks for the API endpoint in its navbar, and remembers it per browser
-  mcp       reads CORE_API_URL and CORE_ADMIN_KEY from mcp/.dev.vars
+  mcp       reads CORE_API_URL and MCP_INSTANCE_ID from mcp/.dev.vars
   site      reads PUBLIC_HAMOLUS_ORIGIN from site/.env (HAMOLUS_API_ORIGIN on Next.js)
   panel     a page inside the console, which already knows the core
 
@@ -627,9 +627,9 @@ export const CORE_LESS_PARTS = {
   mcp: {
     phrase: 'an MCP server',
     addressing:
-      'Set `CORE_API_URL` in `mcp/.dev.vars` to the core\'s `/api` base, and `CORE_ADMIN_KEY` to that core\'s admin key ' +
-      '(or `CORE_API_TOKEN` to a scoped user token). `MCP_BEARER_TOKEN` is a different thing: it authenticates callers ' +
-      'to `/mcp`, not the server to the core.',
+      'Set `CORE_API_URL` in `mcp/.dev.vars` to the core\'s `/api` base, and `MCP_INSTANCE_ID` to the id you ' +
+      'create in the console (Environment -> MCP). Everything else — scope, read-only, tool groups, and who ' +
+      'may call it — is configured there, not here.',
     withFlag: '--with-mcp',
   },
   site: {
