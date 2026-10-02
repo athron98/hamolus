@@ -8,11 +8,20 @@
  * Licensed under the MIT License. See the LICENSE file at the repository root.
  */
 
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
 import stylex from '@stylexjs/unplugin'
 
+/** Read this package's own version off its manifest — one source, never restated. */
+const manifestVersion = (): string =>
+  (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version
+
 export default defineConfig({
+  // The console reports its own version in the sidebar and the account popover, and a
+  // runtime `package.json` read is not available once the bundle is served — so it is
+  // inlined here, from the same manifest the release bump rewrites.
+  define: { __CONSOLE_VERSION__: JSON.stringify(manifestVersion()) },
   plugins: [
     // StyleX must be registered before the framework plugin (Fast Refresh).
     stylex.vite({

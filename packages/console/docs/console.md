@@ -25,14 +25,37 @@ When the core runs in a multi-scope mode (`CORE_MODE=centralized`), each saved
 endpoint can carry an optional **Colony** (`colony` in the endpoint object, labeled
 "Colony — optional" in the login form) set at login or in the navbar add-row. It is
 sent as the `x-colony` header on every request to that endpoint (blank = the
-land's default colony), and the navbar button shows the active endpoint as
-`Name · colony`. Signing in to an already-saved endpoint *merges* the typed
-name/colony into the stored entry.
+land's default colony), and the navbar lists the active endpoint as
+`Name · land · colony`. Signing in to an already-saved endpoint *merges* the typed
+name/land/colony into the stored entry.
 
-Log in with the `ADMIN_KEY` (default `dev-admin-key-change-me`) — the returned JWT
-is stored **per endpoint** (`console-token:{url}`), since each core signs its own
-token. Switching to an endpoint without a saved token returns to login with that
+Both scope fields are collected on the login form because there is no second chance to
+collect them: the endpoint is stored with whatever is typed here, and after sign-in the
+only way to change a colony is the navbar add-row. The login form also **probes the URL
+you typed** (debounced) and shows the core's version and whether it still needs a first
+administrator. That probe follows the typed URL rather than the stored default on
+purpose — checking the default is how a fresh production core gets told "no users yet"
+while a different URL is being typed.
+
+Sign in with a **user account**. The core's `ADMIN_KEY` path (`POST /api/_auth/token`)
+still works so an existing deployment survives an upgrade, but it is deprecated and the
+login form offers it as a link at the bottom rather than a tab beside Sign in. The
+returned JWT is stored **per endpoint** (`console-token:{url}`), since each core signs
+its own token. Switching to an endpoint without a saved token returns to login with that
 endpoint pre-selected.
+
+## Versions
+
+The console reports its own version in the **sidebar footer** and in the **account
+popover**, next to the Core's version and the version each MCP instance reports. The
+Console number is inlined at build time from its manifest (`vite.config.ts` and
+`vite.lib.config.ts` both define `__CONSOLE_VERSION__`); the others are read from the
+API, because Core and MCP are deployed separately from this bundle.
+
+A value that is not reported renders as a dash. That is a real state, not a gap: a core
+older than the version field has no number to give, and an MCP instance whose worker has
+never contacted it has not reported one. See **Environment → MCP** for the per-instance
+`Live` / `No contact for a while` / `Never contacted` state.
 
 ## Using it as a library (generated projects)
 
@@ -429,8 +452,8 @@ are separate permissions — `lands.write` (lands + super admins) and
     [Panel detail (`/panels/:id`)](#panel-detail-panelsid)).
   - **Environment** (`app-environment`, permission-gated members) — Universe
     (`/universe`, `lands.read`), Config (`/config`, `config.read`), Users
-    (`/users`, `users.read`), Seed (`/seed`, `settings.write`). The group hides
-    when no member is permitted.
+    (`/users`, `users.read`), MCP (`/mcp`, `mcp.read`), Seed (`/seed`,
+    `settings.write`). The group hides when no member is permitted.
 - Collections are grouped by their registered **group tree** (`/_meta/groups`):
   - ungrouped collections render flat at the top,
   - groups render as **recursive, collapsible sections** (chevron,
@@ -477,11 +500,11 @@ are separate permissions — `lands.write` (lands + super admins) and
   rendered in the same shortcut row (collections first, then plugins, then panels);
   an id already claimed by a collection or plugin is skipped. Active shortcut gets an
   accent tint.
-- **API endpoint** button (DatabaseIcon + active endpoint's name, with a ` · land`
-  suffix when the endpoint has a land set) opens a
+- **API endpoint** button (DatabaseIcon + active endpoint's name, with a
+  ` · land · colony` suffix when the endpoint has either set) opens a
   drop-down popover: every saved endpoint (check mark on the active one, per-row
   **pencil** to rename inline + ✕ to remove), plus an add-row with **Name + URL +
-  Land** inputs (Enter on any, or ＋, adds and connects). Switching (or adding) an
+  Land + Colony** inputs (Enter on any, or ＋, adds and connects). Switching (or adding) an
   endpoint **hard-reloads the page** — the new active endpoint is persisted, record
   caches are cleared, and the app boots against that core (no saved token for it →
   back to login with that endpoint pre-selected).

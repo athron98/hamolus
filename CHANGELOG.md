@@ -8,6 +8,44 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
+### Added
+
+- **Versions are now visible from the console.** `GET /api/health` (and `GET /`) report
+  a `version`, the console footer shows its own, and the account popover lists all three
+  — Console, Core, and every MCP instance. The console version is inlined at build time
+  from its manifest; `CORE_VERSION` is exported from `@hamolus/core/version`.
+
+  The Core and MCP numbers are the useful half: they are deployed separately from the
+  console bundle, so "the console is new" says nothing about whether the core behind it
+  is. A value that is not reported renders as a dash, never a guess — a core older than
+  the field and an MCP worker that never reported are both real states.
+
+- **An MCP deployment registers itself.** Every machine call carries
+  `x-hamolus-mcp-version`, and the core records it plus a last-seen time against the
+  instance row. **Environment → MCP** gains a *Deployment* column showing whether an
+  instance is `Live`, `No contact for a while`, or `Never contacted`, alongside the
+  release it reports.
+
+  Registered is not deployed: an instance row exists from the moment it is created, so
+  `enabled` alone cannot tell an operator that a worker is behind it. Only the worker
+  writes these two fields — an operator request naming a version is refused by the
+  strict schema — because otherwise the console would certify a release that is not
+  deployed. Added by `ALTER TABLE … ADD COLUMN` guarded on `PRAGMA table_info`, so a core
+  upgraded in place keeps its instances.
+
+### Changed
+
+- **The console login page matches the current core.** It asks for a **Colony** beside
+  Land, which it never did — `store.ts` has carried `ConsoleEndpoint.colony` and every
+  request has sent `x-colony` from it, so a non-default colony was unreachable from the
+  UI. Endpoint setup status and the core's version are now probed against **the URL in
+  the form**, debounced, instead of the stored default: checking on mount is how a fresh
+  production core ended up told "no users yet" while a different URL was being typed.
+- **The admin key is no longer a peer of Sign in.** `POST /api/_auth/token` still works
+  so an existing deployment survives an upgrade, but it is now a link at the bottom of
+  the form with a note that it is deprecated, rather than a third tab that read as a
+  current option.
+
 ## [0.2.10] — 2026-09-30
 
 ### Added

@@ -126,6 +126,21 @@ export const MCP_INSTANCE_ID_PATTERN = /^mcp_[0-9A-Za-z]{26}$/
 /** `hmcp_<id>_<secret>`; the id indexes the row, the secret is only ever stored hashed. */
 export const MCP_TOKEN_PATTERN = /^hmcp_([0-9A-Za-z]{12})_([0-9A-Za-z_-]{43})$/
 
+/**
+ * The header a deployed MCP worker sends to say which release it is running.
+ *
+ * Lives in the shared contract rather than being spelled out in both packages because
+ * it has to be the *same string* on both sides: the core stores whatever arrives under
+ * it and the console renders it, so a typo here is not a compile error anywhere — it
+ * is a column that silently stays `null` forever while every deployment reports in
+ * good faith.
+ *
+ * Additive on purpose. An older worker that never sends it still gets served; it just
+ * records liveness without a version, which is the honest answer rather than a
+ * missing feature.
+ */
+export const MCP_WORKER_VERSION_HEADER = 'x-hamolus-mcp-version'
+
 /** What the worker reads on every request to decide what it may offer. */
 export const mcpInstanceConfigSchema = z
   .object({
@@ -156,6 +171,27 @@ export interface McpInstance {
   dynamicMax: number
   tokenCount: number
   activeTokenCount: number
+  /**
+   * The version the *deployed worker* reported on its last call, or `null` if it has
+   * never called.
+   *
+   * Server-owned, never operator-supplied: nothing in `mcpInstanceCreateSchema` or
+   * `mcpInstanceUpdateSchema` writes it, because the only party that knows which
+   * release is deployed is the deployment itself. A worker predating this field simply
+   * stops reporting and the row keeps whatever it last said — which is the point, since
+   * "unknown" and "reporting 0.2.9" are different answers and only one of them is
+   * evidence.
+   */
+  reportedVersion: string | null
+  /**
+   * When the worker last reached this core, or `null` if it never has.
+   *
+   * This is what turns an `enabled` row into a live one. `enabled` is a switch an
+   * operator flipped; it stays true forever whether or not anything is deployed behind
+   * it, so a row with no `lastSeenAt` is a credential with no server rather than a
+   * server with a problem.
+   */
+  lastSeenAt: string | null
   createdAt: string
   updatedAt: string
 }

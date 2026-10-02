@@ -324,6 +324,45 @@ function copy(text: string): void {
   void navigator.clipboard?.writeText(text)
 }
 
+/**
+ * How stale a heartbeat is, in the three states an operator actually acts on.
+ *
+ * The threshold is the worker's own `CONFIG_TTL_MS` (60s) doubled, not a round number
+ * chosen for looks: a deployment polls its config about once a minute, so anything past
+ * a couple of minutes means the worker stopped reaching this core rather than that it
+ * was slow. `never` is kept separate from `stale` on purpose — a row that has never been
+ * contacted is a deployment that was never finished, and reading that as "went offline"
+ * sends someone looking for a network problem that does not exist.
+ */
+type Presence = 'never' | 'live' | 'stale'
+
+function presence(lastSeenAt: string | null): Presence {
+  if (!lastSeenAt) return 'never'
+  const at = Date.parse(lastSeenAt)
+  if (Number.isNaN(at)) return 'never'
+  return Date.now() - at > 2 * 60 * 1000 ? 'stale' : 'live'
+}
+
+const PRESENCE_LABEL: Record<Presence, string> = {
+  never: 'Never contacted',
+  live: 'Live',
+  stale: 'No contact for a while',
+}
+
+/** Compact age, for a table cell. Falls back to the absolute date past a week. */
+function ageLabel(lastSeenAt: string | null): string {
+  const at = lastSeenAt ? Date.parse(lastSeenAt) : Number.NaN
+  if (Number.isNaN(at)) return '—'
+  const mins = Math.floor((Date.now() - at) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(at).toISOString().slice(0, 10)
+}
+
 export function McpPage() {
   const queryClient = useQueryClient()
 
@@ -486,7 +525,8 @@ const coreUrl = () => {
         <div>
           <h1 {...stylex.props(s.heading)}>MCP</h1>
           <p {...stylex.props(s.subheading)}>
-            Configure an MCP server without redeploying it.
+            Configure an MCP server without redeploying it, and see which release is
+            actually deployed behind each instance.
           </p>
         </div>
         <Show when={canWrite()}>
@@ -546,6 +586,13 @@ const coreUrl = () => {
                 <th {...stylex.props(styles.th)}>Scope</th>
                 <th {...stylex.props(styles.th)}>Access</th>
                 <th {...stylex.props(styles.th)}>Tool groups</th>
+                {/*
+                  Registered is not the same as deployed. The instance row exists from
+                  the moment it is created, so "Enabled" alone cannot tell an operator
+                  whether a worker is actually behind it — this column reports what the
+                  deployment last said about itself.
+                */}
+                <th {...stylex.props(styles.th)}>Deployment</th>
                 <th {...stylex.props(styles.th)}>Tokens</th>
                 <th {...stylex.props(styles.th)} />
               </tr>
@@ -555,7 +602,7 @@ const coreUrl = () => {
                 each={instances.data ?? []}
                 fallback={
                   <tr>
-                    <td {...stylex.props(styles.td)} colSpan={6}>
+                    <td {...stylex.props(styles.td)} colSpan={7}>
                       <div {...stylex.props(styles.empty)}>
                         No MCP instances in this scope yet. Create one to get the two
                         deployment values.
@@ -593,6 +640,34 @@ const coreUrl = () => {
                         <For each={inst.toolGroups}>
                           {(g) => <span {...stylex.props(styles.groupChip)}>{g}</span>}
                         </For>
+                      </span>
+                    </td>
+                    <td {...stylex.props(styles.td)}>
+                      <span {...stylex.props(styles.labelCell)}>
+                        <span
+                          {...stylex.props(
+                            styles.pill,
+                            presence(inst.lastSeenAt) === 'live'
+                              ? styles.okPill
+                              : presence(inst.lastSeenAt) === 'stale'
+                                ? styles.offPill
+                                : styles.dimPill,
+                          )}
+                        >
+                          {PRESENCE_LABEL[presence(inst.lastSeenAt)]}
+                          {presence(inst.lastSeenAt) === 'live' && <CheckIcon size={11} />}
+                        </span>
+                        <span {...stylex.props(styles.labelSub)}>
+                          {/*
+                            "no version" rather than a blank or a dash: the worker did
+                            contact this core, it just predates the header that reports a
+                            release. Conflating it with "never contacted" would hide the
+                            upgrade it is a sign of.
+                          */}
+                          {inst.lastSeenAt
+                            ? `v${inst.reportedVersion ?? 'unknown'} · ${ageLabel(inst.lastSeenAt)}`
+                            : 'not deployed yet'}
+                        </span>
                       </span>
                     </td>
                     <td {...stylex.props(styles.td)}>

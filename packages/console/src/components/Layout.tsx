@@ -20,7 +20,7 @@ import { useCollections } from '../hooks/collections'
 import { pluginById, plugins } from '../plugins/registry'
 import { useGroups } from '../hooks/groups'
 import { usePanels } from '../hooks/panels'
-import { activeEndpoint, addEndpoint, activeUrl, endpoints, removeEndpoint, renameEndpoint, setEndpoint, storeToken } from '../lib/store'
+import { activeEndpoint, addEndpoint, activeUrl, apiBase, colony, endpoints, land, removeEndpoint, renameEndpoint, setEndpoint, storeToken } from '../lib/store'
 import { clearRecordCaches } from '../lib/cache'
 import { clearSession, hasPermission, user } from '../lib/session'
 import { FONTS, THEMES, applyFont, applyMode, applyPalette, font, isDark, mode, palette } from '../lib/theme'
@@ -36,6 +36,7 @@ import {
 } from '../lib/prefs'
 import { locale, setLocale } from '../lib/locale'
 import { api } from '../lib/api'
+import { CONSOLE_VERSION } from '../lib/version'
 import { useLocalization } from '../hooks/localization'
 import {
   BracesIcon,
@@ -847,6 +848,39 @@ const styles = stylex.create({
     fontSize: 11,
     color: tokens.textDim,
   },
+  /** A separator between the identity block and the version block in the account popover. */
+  versionBlock: {
+    marginTop: 8,
+    paddingTop: 8,
+    boxShadow: `inset 0 1px 0 0 ${tokens.border}`,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 3,
+  },
+  versionTitle: {
+    fontSize: 10,
+    fontWeight: 700,
+    color: tokens.textDim,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  versionRow: {
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
+    fontSize: 11,
+  },
+  versionName: {
+    color: tokens.textDim,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  versionValue: {
+    fontFamily: tokens.fontMono,
+    color: tokens.text,
+  },
   groupChild: {
     paddingLeft: 10,
   },
@@ -1053,6 +1087,7 @@ export function Layout(props: { children?: JSX.Element }) {
   const [newEndpoint, setNewEndpoint] = createSignal('')
   const [newEndpointName, setNewEndpointName] = createSignal('')
   const [newEndpointLand, setNewEndpointLand] = createSignal('')
+  const [newEndpointColony, setNewEndpointColony] = createSignal('')
   const [renameUrl, setRenameUrl] = createSignal<string | null>(null)
   const [renameValue, setRenameValue] = createSignal('')
   const [sideOpen, setSideOpen] = createSignal(false)
@@ -1062,6 +1097,60 @@ export function Layout(props: { children?: JSX.Element }) {
   const [counts, setCounts] = createSignal<Record<string, number>>({})
   const [desktop, setDesktop] = createSignal<boolean>(false)
   const [userOpen, setUserOpen] = createSignal(false)
+
+  /**
+   * The versions of the two things this bundle does not contain.
+   *
+   * Both are fetched when the account popover opens, not on mount, for two reasons: the
+   * popover is where they are read, and this is a header that renders on every screen,
+   * so a version probe on every page would be a request nobody asked for. The values
+   * are then kept — re-opening the popover re-probes, because a core can be redeployed
+   * under the operator while the page stays open.
+   *
+   * `probe` answers `null` on any failure, including a core that predates the version
+   * field. Both cases render as a dash: "did not say" is the honest answer, and a
+   * guessed release is worse than a blank when someone is deciding whether to upgrade.
+   */
+  const [coreVersion, setCoreVersion] = createSignal<string | null>(null)
+  const [mcpVersions, setMcpVersions] = createSignal<{ label: string; id: string; reportedVersion: string | null }[]>([])
+
+  /**
+   * Whether to read MCP rows at all.
+   *
+   * Gated on `mcp.read` because the version block is not a way around the page's own
+   * permission: without this, an operator who cannot open `/mcp` would learn that
+   * instances exist in their colony from the account popover.
+   */
+  const canReadMcp = createMemo(() => hasPermission('mcp.read'))
+
+  const loadVersions = async () => {
+    const probe = await api.probe(apiBase())
+    setCoreVersion(probe.version)
+    if (!canReadMcp()) {
+      setMcpVersions([])
+      return
+    }
+    try {
+      const res = await api.listMcpInstances({ land: land(), colony: colony() })
+      setMcpVersions(
+        res.data.map((inst) => ({ label: inst.label, id: inst.id, reportedVersion: inst.reportedVersion })),
+      )
+    } catch {
+      // A console pointed at an older core that serves no MCP route is a normal
+      // mismatch; the block simply shows the versions it does know.
+      setMcpVersions([])
+    }
+  }
+
+  // Re-probe each time the popover opens rather than once per mount.
+  createEffect(
+    on(
+      userOpen,
+      (open) => {
+        if (open) void loadVersions()
+      },
+    ),
+  )
 
   createEffect(() => {
     if (typeof window === 'undefined') return
@@ -1222,14 +1311,15 @@ export function Layout(props: { children?: JSX.Element }) {
     window.location.reload()
   }
 
-  const addAndSwitchEndpoint = (raw: string, label?: string, landValue?: string) => {
+  const addAndSwitchEndpoint = (raw: string, label?: string, landValue?: string, colonyValue?: string) => {
     const url = raw.trim()
     if (!url) return
-    addEndpoint(url, label, landValue)
+    addEndpoint(url, label, landValue, colonyValue)
     clearRecordCaches()
     setNewEndpoint('')
     setNewEndpointName('')
     setNewEndpointLand('')
+    setNewEndpointColony('')
     setEndpointOpen(false)
     window.location.reload()
   }
@@ -1346,8 +1436,17 @@ export function Layout(props: { children?: JSX.Element }) {
                             )}
                           >
                             <span {...stylex.props(styles.endpointRowLabel)}>{ep.label}</span>
-                            <Show when={ep.land}>
-                              <span {...stylex.props(styles.endpointRowLand)}>{ep.land}</span>
+                            {/*
+                              Colony is shown beside Land, and only when set. Two saved
+                              endpoints on the same core differing only by colony look
+                              identical without it, and picking the wrong one is a
+                              session scoped to the wrong data with no visible symptom
+                              until a record is missing.
+                            */}
+                            <Show when={ep.land || ep.colony}>
+                              <span {...stylex.props(styles.endpointRowLand)}>
+                                {[ep.land, ep.colony].filter(Boolean).join(' · ')}
+                              </span>
                             </Show>
                             <span {...stylex.props(styles.endpointRowUrl)}>{ep.url}</span>
                             {activeUrl() === ep.url && <CheckIcon size={12} strokeWidth={2.4} />}
@@ -1449,7 +1548,28 @@ export function Layout(props: { children?: JSX.Element }) {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault()
-                          addAndSwitchEndpoint(newEndpoint(), newEndpointName(), newEndpointLand())
+                          addAndSwitchEndpoint(newEndpoint(), newEndpointName(), newEndpointLand(), newEndpointColony())
+                        }
+                      }}
+                      {...stylex.props(s.input)}
+                    />
+                    {/*
+                      Colony sits beside Land here for the same reason it sits beside
+                      Land on the login form: both are only needed on a multi-scope
+                      core, and both are sent as a header on every request afterwards.
+                      A colony that is not set here is one you have to sign out and back
+                      in to change.
+                    */}
+                    <input
+                      type="text"
+                      placeholder="Colony — optional"
+                      value={newEndpointColony()}
+                      spellcheck={false}
+                      onInput={(e) => setNewEndpointColony(e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addAndSwitchEndpoint(newEndpoint(), newEndpointName(), newEndpointLand(), newEndpointColony())
                         }
                       }}
                       {...stylex.props(s.input)}
@@ -1457,7 +1577,9 @@ export function Layout(props: { children?: JSX.Element }) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => addAndSwitchEndpoint(newEndpoint(), newEndpointName(), newEndpointLand())}
+                    onClick={() =>
+                      addAndSwitchEndpoint(newEndpoint(), newEndpointName(), newEndpointLand(), newEndpointColony())
+                    }
                     disabled={!newEndpoint().trim()}
                     title="Add and connect"
                     {...stylex.props(styles.endpointAddBtn)}
@@ -1696,6 +1818,43 @@ export function Layout(props: { children?: JSX.Element }) {
                   <div {...stylex.props(styles.userPopLabel)}>@{user()!.username}</div>
                   <div {...stylex.props(styles.userPopLabel)}>
                     {user()!.privilegeLabel ?? user()!.privilegeName ?? '—'}
+                  </div>
+                  {/*
+                    What is running, in the one place an operator is already looking.
+
+                    Core and MCP are read from the API rather than stamped at build time
+                    because both are deployed separately from this bundle — a console can
+                    be newer than the core it is pointed at, and that gap is exactly what
+                    this is for. A dash means "did not say", never a guess: a core older
+                    than the version field and an MCP worker that never reported are
+                    both real states, and rendering either as a number would be a lie.
+                  */}
+                  <div {...stylex.props(styles.versionBlock)}>
+                    <div {...stylex.props(styles.versionTitle)}>Versions</div>
+                    <div {...stylex.props(styles.versionRow)}>
+                      <span {...stylex.props(styles.versionName)}>Console</span>
+                      <span {...stylex.props(styles.versionValue)}>v{CONSOLE_VERSION}</span>
+                    </div>
+                    <div {...stylex.props(styles.versionRow)}>
+                      <span {...stylex.props(styles.versionName)}>Core</span>
+                      <span {...stylex.props(styles.versionValue)}>
+                        {coreVersion() ? `v${coreVersion()}` : '—'}
+                      </span>
+                    </div>
+                    <Show when={mcpVersions().length > 0}>
+                      <For each={mcpVersions()}>
+                        {(m) => (
+                          <div {...stylex.props(styles.versionRow)}>
+                            <span {...stylex.props(styles.versionName)} title={m.id}>
+                              MCP · {m.label}
+                            </span>
+                            <span {...stylex.props(styles.versionValue)}>
+                              {m.reportedVersion ? `v${m.reportedVersion}` : '—'}
+                            </span>
+                          </div>
+                        )}
+                      </For>
+                    </Show>
                   </div>
                 </div>
               </Show>
@@ -2055,6 +2214,7 @@ export function Layout(props: { children?: JSX.Element }) {
         </div>
         <footer {...stylex.props(styles.footer)}>
           <span {...stylex.props(styles.footerText)}>Hamolus · Headless CMS for Cloudflare Workers</span>
+          <span {...stylex.props(styles.footerText)}>v{CONSOLE_VERSION}</span>
           <span {...stylex.props(styles.footerText)}>© {year}</span>
         </footer>
       </main>

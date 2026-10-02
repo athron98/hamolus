@@ -42,6 +42,11 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./version": {
+      "//": "A subpath, not a re-export from `.`: `src/index.ts` is the Worker entry and workerd rejects any named export that is not a handler, so the constant cannot be re-exported from there. This is the only way for a project's own seam file to read the same number.",
+      "types": "./src/version.ts",
+      "default": "./src/version.ts"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {

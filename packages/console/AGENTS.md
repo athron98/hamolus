@@ -34,7 +34,7 @@ reactive registry on their first paint.
 | `src/App.tsx` | routes and the shell |
 | `src/pages/` | one file per screen: Dashboard, Collections, CollectionPage, Documents, Media, Files, Panels, PanelEditor, Users, Groups, Lands, Config, Plugins, Seed, Login, Universe |
 | `src/components/` | shared UI: `Table`, `FormInput`, `RecordForm`, editors, pickers, dialogs |
-| `src/lib/` | `api.ts` (the HTTP client), `session.ts`, `cache.ts`, `store.ts` (signals), `theme.ts`, `pluginKv.ts`, … |
+| `src/lib/` | `api.ts` (the HTTP client), `session.ts`, `cache.ts`, `store.ts` (signals), `theme.ts`, `pluginKv.ts`, `version.ts` (build-injected `CONSOLE_VERSION`), … |
 | `src/plugins/` | the console's own plugin *types*, not host plugins |
 | `src/index.css` | **the single source of truth for every StyleX token** |
 | `src/theme.stylex.ts` | StyleX tokens, each a `var(--x)` reference into `index.css` |
@@ -57,6 +57,10 @@ reactive registry on their first paint.
   instance instead of registering twice.
 - The API endpoint is chosen at runtime in the navbar and remembered per browser —
   there is no env var to fill in for a generated console.
+- **The version shown in the footer must come from the build, not the manifest at
+  runtime.** `CONSOLE_VERSION` is inlined by both Vite configs, so `build:lib` resolves
+  it while the manifest is still reachable; afterwards the bundle is opaque to its host.
+  Do not move the read into component code.
 
 ## Gates
 

@@ -52,7 +52,35 @@ import type {
   SuperAdminUser,
   TaxonomyAction,
 } from '@hamolus/types'
-import { apiBase, colony, land, storeToken, token } from './store'
+import { apiBase, colony, land, normalizeEndpoint, storeToken, token } from './store'
+
+/**
+ * The public body of `GET /api/health`.
+ *
+ * `version` is optional on purpose: a core predating it answers `{ ok, service }` and
+ * still works, and the console renders "unknown" rather than claiming a release it was
+ * never told. Treat the field as absent-means-nothing, not as an error.
+ */
+export interface CoreHealth {
+  ok: true
+  service: string
+  version?: string
+}
+
+/**
+ * What `api.probe` learned about one endpoint before sign-in.
+ *
+ * `setupKnown` exists because `setupRequired: false` and "the probe never came back"
+ * are otherwise the same value, and the difference is whether the console should offer
+ * the Setup tab at all. Defaulting a failed probe to `false` would quietly hide a first
+ * administrator behind a login form nobody can satisfy.
+ */
+export interface CoreProbe {
+  reachable: boolean
+  version: string | null
+  setupRequired: boolean
+  setupKnown: boolean
+}
 
 /** One aspect-ratio variant to upload alongside the default asset (paired with a `variantMeta` part). */
 export interface MediaVariantUpload {
@@ -481,6 +509,50 @@ export const api = {
   },
 
   // ---- auth ----
+
+  /**
+   * What a core answers *before* signing in: its version, and whether it still needs
+   * the first administrator.
+   *
+   * Both come off one explicit base URL rather than through `request`, because the
+   * login page is the one screen where the URL in play is not the stored default — the
+   * operator is typing it. Asking `request` here answers a question about the wrong
+   * core, which is how "this core has no users yet, create the first administrator"
+   * ends up shown above a production login form.
+   *
+   * Neither call needs a token: `/api/health` is in the core's `AUTH_SKIP` set and
+   * `GET /_auth/setup` is the pre-auth setup probe by design.
+   *
+   * Both answers are independently optional and `null` on failure rather than thrown.
+   * Unreachable is a normal state of the "type a new URL" flow, and a caller painting
+   * a hint has nothing to do with a stack trace. `version` is `null` for a core that
+   * predates the field — "did not say" is not "unknown release".
+   */
+  async probe(base: string): Promise<CoreProbe> {
+    const root = normalizeEndpoint(base).replace(/\/api\/?$/, '')
+    const get = async <T>(path: string): Promise<T | null> => {
+      try {
+        const res = await fetch(`${root}${path}`)
+        if (!res.ok) return null
+        return (await res.json().catch(() => null)) as T
+      } catch {
+        return null
+      }
+    }
+    const [health, setup] = await Promise.all([
+      get<CoreHealth>('/api/health'),
+      get<{ data?: { setupRequired?: boolean } }>('/api/_auth/setup'),
+    ])
+    return {
+      reachable: health?.ok === true,
+      version: typeof health?.version === 'string' ? health.version : null,
+      setupRequired: setup?.data?.setupRequired === true,
+      // A core that answers the setup probe but not `/health` is still usable; treat
+      // either success as "reachable" so the hint is not wrong about a deployment that
+      // only exposes one of the two.
+      setupKnown: setup?.data?.setupRequired !== undefined,
+    }
+  },
 
   setupStatus(): Promise<{ data: { setupRequired: boolean } }> {
     return request('/_auth/setup')

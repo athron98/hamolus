@@ -16,7 +16,9 @@
  *   - the lockstep package manifests;
  *   - `FALLBACK_RANGES` in the CLI, the ranges a generated project is handed when no
  *     version can be discovered, plus `DEFAULT_VERSION_RANGE` beside it;
- *   - `CLI_VERSION` and `SERVER_VERSION`, the versions the two binaries report;
+ *   - `CLI_VERSION`, `SERVER_VERSION`, `CORE_VERSION` and
+ *     `FALLBACK_CONSOLE_VERSION`, the versions the two binaries report and the two the
+ *     console reads;
  *   - the `^`-ranges in every template and every example, because those trees are not
  *     workspace members and so are never resolved against the local packages.
  *
@@ -30,7 +32,7 @@
  *   1. the lockstep packages share one version, and it is the current one;
  *   2. every `@hamolus/*` range in `templates/**`, `packages/cli/templates/**` and
  *      `examples/**` matches the version of the package it names;
- *   3. the four own-version constants above equal the lockstep version;
+ *   3. the six own-version constants above equal the lockstep version;
  *   4. the root CHANGELOG.md has a dated entry for it, and an `[Unreleased]` section.
  *
  * Rule 2 is deliberately per-package rather than "everything is `^X`", because the
@@ -73,7 +75,15 @@ const INDEPENDENT_GLOB = 'packages/plugins'
  */
 const OWN_VERSION_CONSTANTS = [
   { file: 'packages/cli/src/help.ts', name: 'CLI_VERSION', range: false },
-  { file: 'packages/mcp/src/index.ts', name: 'SERVER_VERSION', range: false },
+  { file: 'packages/mcp/src/version.ts', name: 'SERVER_VERSION', range: false },
+  // `CORE_VERSION` is the number the console reads off `/api/health`, so a core that
+  // lags the workspace by a release is a deployed worker answering with last month's
+  // number — healthy in every way a health check measures.
+  { file: 'packages/core/src/version.ts', name: 'CORE_VERSION', range: false },
+  // The console's own version is stamped in at build time from this manifest, so it
+  // cannot drift; the constant is checked only so a build that failed to inject it
+  // is caught here instead of rendering "undefined" in the footer.
+  { file: 'packages/console/src/lib/version.ts', name: 'FALLBACK_CONSOLE_VERSION', range: false },
   { file: 'packages/cli/src/sources.ts', name: 'DEFAULT_VERSION_RANGE', range: true },
 ]
 

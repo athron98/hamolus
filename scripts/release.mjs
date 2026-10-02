@@ -310,9 +310,27 @@ function bumpVersion(bump, dry) {
     apply: (text) => text.replace(/(CLI_VERSION = ')[^']+(')/, `$1${next}$2`),
   })
   edits.push({
-    what: 'SERVER_VERSION (packages/mcp/src/index.ts)',
-    path: join(REPO, 'packages', 'mcp', 'src', 'index.ts'),
+    what: 'SERVER_VERSION (packages/mcp/src/version.ts)',
+    path: join(REPO, 'packages', 'mcp', 'src', 'version.ts'),
     apply: (text) => text.replace(/(SERVER_VERSION = ')[^']+(')/, `$1${next}$2`),
+  })
+  // `CORE_VERSION` is what the console reads off `/api/health`. Missing it is the
+  // quietest release failure there is: the core deploys, serves, and answers with the
+  // previous release's number, so the console tells an operator they are current when
+  // they are not.
+  edits.push({
+    what: 'CORE_VERSION (packages/core/src/version.ts)',
+    path: join(REPO, 'packages', 'core', 'src', 'version.ts'),
+    apply: (text) => text.replace(/(CORE_VERSION = ')[^']+(')/, `$1${next}$2`),
+  })
+  // The console's real version is inlined by Vite from its manifest, so this literal is
+  // only the fallback for a host that compiles it with its own config. It still has to
+  // move: `check-package-versions` compares it, and a stale fallback is a footer that
+  // disagrees with the number inlined beside it.
+  edits.push({
+    what: 'FALLBACK_CONSOLE_VERSION (packages/console/src/lib/version.ts)',
+    path: join(REPO, 'packages', 'console', 'src', 'lib', 'version.ts'),
+    apply: (text) => text.replace(/(FALLBACK_CONSOLE_VERSION = ')[^']+(')/, `$1${next}$2`),
   })
 
   // The ranges a generated project is handed when no version can be discovered. These

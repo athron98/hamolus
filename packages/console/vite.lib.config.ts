@@ -8,9 +8,14 @@
  * Licensed under the MIT License. See the LICENSE file at the repository root.
  */
 
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
 import stylex from '@stylexjs/unplugin'
+
+/** Read this package's own version off its manifest — one source, never restated. */
+const manifestVersion = (): string =>
+  (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version
 
 /**
  * Library build for `@hamolus/console`.
@@ -31,6 +36,11 @@ import stylex from '@stylexjs/unplugin'
  * compiler, and never has to create a folder to vendor plugin source into.
  */
 export default defineConfig({
+  // Same injection as the SPA build, and it is *required* here rather than optional:
+  // a generated console imports `dist-lib/index.js`, so this config is the last place
+  // the version can be resolved from the manifest. Without it the host would render
+  // the fallback literal for every console it ever installs.
+  define: { __CONSOLE_VERSION__: JSON.stringify(manifestVersion()) },
   plugins: [
     // Order matters: StyleX must compile before the framework plugin transforms JSX.
     stylex.vite({

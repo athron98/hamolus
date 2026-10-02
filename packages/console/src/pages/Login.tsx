@@ -8,14 +8,42 @@
  * Licensed under the MIT License. See the LICENSE file at the repository root.
  */
 
-import { createSignal, For, onMount, Show } from 'solid-js'
+/**
+ * The pre-auth screen: pick an endpoint, then sign in to it.
+ *
+ * Three things here are load-bearing and all three are about *which core you are
+ * looking at*:
+ *
+ * 1. **The endpoint is a choice, so everything else follows it.** Setup status, the
+ *    core's version and the scope headers all have to be read from the URL in the form,
+ *    not from the stored default. Checking setup status on mount against the default
+ *    means a fresh production core is told "no users yet" while the operator is typing
+ *    a different URL — and the Setup tab is then the most prominent thing on a screen
+ *    for a core that already has an administrator.
+ * 2. **Colony is asked for here, because after this screen there is no way to add it.**
+ *    `store.ts` has carried `ConsoleEndpoint.colony` and every request sends `x-colony`
+ *    from it, but this form never collected it, so the field could only ever be empty —
+ *    a colony other than the default was unreachable from the UI. It sits beside Land
+ *    for the same reason and with the same optionality: both are only needed on a
+ *    core running more than one scope.
+ * 3. **The admin key is not a peer of Sign in.** It is the deprecated `ADMIN_KEY`
+ *    exchange, kept working on the core for one more release so an existing deployment
+ *    is not locked out by an upgrade. Presenting it as a third equal tab is what makes
+ *    it look current, so it is a link at the bottom that opens the field.
+ */
+
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import * as stylex from '@stylexjs/stylex'
-import { api } from '../lib/api'
+import { api, type CoreProbe } from '../lib/api'
 import { addEndpoint, apiBase, endpoints, storeToken } from '../lib/store'
 import { applySession } from '../lib/session'
+import { CONSOLE_VERSION } from '../lib/version'
 import { s, tokens } from '../theme.stylex'
 
 type Mode = 'setup' | 'login' | 'legacy'
+
+/** How long to wait after the last keystroke before probing. A hostname is typed in pieces. */
+const PROBE_DEBOUNCE_MS = 500
 
 const cardFade = stylex.keyframes({
   from: { opacity: 0, transform: 'translateY(6px)' },
@@ -56,7 +84,7 @@ const styles = stylex.create({
   },
   modeRow: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateColumns: 'repeat(2, 1fr)',
     gap: 4,
     backgroundColor: tokens.bg,
     borderRadius: tokens.radiusSm,
@@ -79,12 +107,63 @@ const styles = stylex.create({
     color: tokens.accent,
     backgroundColor: tokens.accentSoft,
   },
+  /**
+   * The endpoint's own identity, shown under the URL field.
+   *
+   * Its job is to make "which core am I about to log into" answerable before the
+   * credentials are typed. `unknown` for the version is a real state — a core older
+   * than the field — and it is worded that way rather than shown blank or guessed.
+   */
+  probe: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 11,
+    color: tokens.textDim,
+    marginTop: -6,
+    minHeight: 16,
+  },
+  probeOk: {
+    color: tokens.ok,
+  },
+  probeBad: {
+    color: tokens.danger,
+  },
+  /** Deprecation notice for the admin-key path: an alternative, not an equal choice. */
+  legacyNote: {
+    fontSize: 11,
+    color: tokens.textDim,
+    marginTop: -6,
+  },
+  legacyLink: {
+    alignSelf: 'center',
+    background: 'none',
+    borderStyle: 'none',
+    padding: '4px 0',
+    fontSize: 11,
+    color: tokens.textDim,
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    textUnderlineOffset: 3,
+    ':hover': { color: tokens.accent },
+    ':focus-visible': { outline: 'none', boxShadow: `0 0 0 3px ${tokens.focusRing}` },
+  },
+  consoleVersion: {
+    alignSelf: 'center',
+    fontSize: 10,
+    color: tokens.textDim,
+    marginTop: 2,
+  },
 })
+
+/** Nothing probed yet — the initial state before the first debounce fires. */
+const UNPROBED: CoreProbe = { reachable: false, version: null, setupRequired: false, setupKnown: false }
 
 export function LoginPage() {
   const [mode, setMode] = createSignal<Mode>('login')
   const [setupAvailable, setSetupAvailable] = createSignal(false)
-  const [loadingSetup, setLoadingSetup] = createSignal(true)
+  const [probing, setProbing] = createSignal(true)
+  const [probe, setProbe] = createSignal<CoreProbe>(UNPROBED)
   const [username, setUsername] = createSignal('')
   const [name, setName] = createSignal('')
   const [password, setPassword] = createSignal('')
@@ -92,21 +171,59 @@ export function LoginPage() {
   const [endpoint, setEndpoint] = createSignal(apiBase())
   const [endpointName, setEndpointName] = createSignal('')
   const [endpointLand, setEndpointLand] = createSignal('')
+  const [endpointColony, setEndpointColony] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
 
-  onMount(async () => {
-    try {
-      const { data } = await api.setupStatus()
-      setSetupAvailable(data.setupRequired)
-      setMode(data.setupRequired ? 'setup' : 'login')
-    } catch {
-      setSetupAvailable(false)
-      setMode('login')
-    } finally {
-      setLoadingSetup(false)
+  /**
+   * Probe the URL currently in the form, debounced, and drop a stale answer.
+   *
+   * The sequence guard is what makes typing safe: without it, a slow probe of a
+   * half-typed hostname resolves after a fast probe of the finished one and overwrites
+   * it, showing one core's version above another core's URL. `probing` is only cleared
+   * by the answer that is still current.
+   */
+  let probeSeq = 0
+  const runProbe = (base: string) => {
+    const seq = ++probeSeq
+    setProbing(true)
+    void api.probe(base).then((result) => {
+      if (seq !== probeSeq) return
+      setProbe(result)
+      setProbing(false)
+      if (result.setupKnown) setSetupAvailable(result.setupRequired)
+    })
+  }
+
+  let debounce: ReturnType<typeof setTimeout> | undefined
+  createEffect(() => {
+    const base = endpoint()
+    if (debounce) clearTimeout(debounce)
+    debounce = setTimeout(() => runProbe(base), PROBE_DEBOUNCE_MS)
+  })
+  onCleanup(() => {
+    if (debounce) clearTimeout(debounce)
+  })
+
+  onMount(() => {
+    // The saved-endpoint pick already carries a scope, and the stored one usually does
+    // too — a second sign-in should not have to retype the colony it was saved with.
+    const active = endpoints().find((e) => e.url === apiBase())
+    if (active) {
+      setEndpointName(active.label)
+      setEndpointLand(active.land ?? '')
+      setEndpointColony(active.colony ?? '')
     }
   })
+
+  const pickEndpoint = (url: string) => {
+    const ep = endpoints().find((x) => x.url === url)
+    if (!ep) return
+    setEndpoint(ep.url)
+    setEndpointName(ep.label)
+    setEndpointLand(ep.land ?? '')
+    setEndpointColony(ep.colony ?? '')
+  }
 
   const canSubmit = () => {
     if (busy()) return false
@@ -121,7 +238,7 @@ export function LoginPage() {
     setBusy(true)
     setError(null)
     try {
-      addEndpoint(endpoint(), endpointName(), endpointLand())
+      addEndpoint(endpoint(), endpointName(), endpointLand(), endpointColony())
       if (mode() === 'setup') {
         const res = await api.setup({ username: username().trim(), name: name().trim(), password: password() })
         storeToken(res.data.token)
@@ -147,51 +264,13 @@ export function LoginPage() {
         <div {...stylex.props(styles.title)}>Hamolus Console</div>
         <p {...stylex.props(styles.subtitle)}>
           {mode() === 'setup'
-            ? 'No users yet — create the first administrator account.'
-            : 'Manage collections, records, media, users & configuration.'}
+            ? 'No users yet on this core — create the first administrator account.'
+            : 'Manage collections, records, media, users, MCP servers & configuration.'}
         </p>
-
-        <Show when={!loadingSetup()}>
-          <div {...stylex.props(styles.modeRow)}>
-            <button
-              type="button"
-              onClick={() => setMode('setup')}
-              disabled={!loadingSetup() && !setupAvailable()}
-              {...stylex.props(styles.modeBtn, mode() === 'setup' && styles.modeActive)}
-            >
-              Setup
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('login')}
-              {...stylex.props(styles.modeBtn, mode() === 'login' && styles.modeActive)}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('legacy')}
-              {...stylex.props(styles.modeBtn, mode() === 'legacy' && styles.modeActive)}
-            >
-              Admin key
-            </button>
-          </div>
-        </Show>
 
         <Show when={endpoints().length > 1}>
           <label {...stylex.props(s.label)}>Saved endpoints</label>
-          <select
-            {...stylex.props(s.select)}
-            onChange={(e) => {
-              const u = e.currentTarget.value
-              const ep = endpoints().find((x) => x.url === u)
-              if (ep) {
-                setEndpoint(ep.url)
-                setEndpointName(ep.label)
-                setEndpointLand(ep.land ?? '')
-              }
-            }}
-          >
+          <select {...stylex.props(s.select)} onChange={(e) => pickEndpoint(e.currentTarget.value)}>
             <option value="" disabled>
               Select a saved endpoint…
             </option>
@@ -199,7 +278,8 @@ export function LoginPage() {
               {(ep) => (
                 <option value={ep.url}>
                   {ep.label}
-                  {ep.land ? ` · ${ep.land}` : ''} — {ep.url}
+                  {ep.land ? ` · ${ep.land}` : ''}
+                  {ep.colony ? ` · ${ep.colony}` : ''} — {ep.url}
                 </option>
               )}
             </For>
@@ -223,6 +303,29 @@ export function LoginPage() {
           placeholder="/api or https://host/api"
           spellcheck={false}
         />
+
+        {/*
+          Which core answered, before any credential is typed. Wording is deliberate:
+          "unknown" is what a core predating the version field says, and "no version" or
+          a blank cell would both read as a bug in the console.
+        */}
+        <Show
+          when={!probing()}
+          fallback={<div {...stylex.props(styles.probe)}>Checking this core…</div>}
+        >
+          <div
+            {...stylex.props(
+              styles.probe,
+              probe().reachable ? styles.probeOk : styles.probeBad,
+            )}
+          >
+            <Show when={probe().reachable} fallback={<>Not reachable</>}>
+              Core {probe().version ?? 'version unknown'}
+              {probe().setupRequired ? ' · no users yet' : ''}
+            </Show>
+          </div>
+        </Show>
+
         <label {...stylex.props(s.label)}>Land — optional</label>
         <input
           type="text"
@@ -232,6 +335,36 @@ export function LoginPage() {
           placeholder="e.g. staging (blank = default land)"
           spellcheck={false}
         />
+        <label {...stylex.props(s.label)}>Colony — optional</label>
+        <input
+          type="text"
+          {...stylex.props(s.input)}
+          value={endpointColony()}
+          onInput={(e) => setEndpointColony(e.currentTarget.value)}
+          placeholder="e.g. brand (blank = default colony)"
+          spellcheck={false}
+        />
+
+        <Show when={mode() === 'setup' || mode() === 'login'}>
+          <div {...stylex.props(styles.modeRow)}>
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              {...stylex.props(styles.modeBtn, mode() === 'login' && styles.modeActive)}
+            >
+              Sign in
+            </button>
+            <Show when={setupAvailable()}>
+              <button
+                type="button"
+                onClick={() => setMode('setup')}
+                {...stylex.props(styles.modeBtn, mode() === 'setup' && styles.modeActive)}
+              >
+                Setup
+              </button>
+            </Show>
+          </div>
+        </Show>
 
         <Show when={mode() === 'login' || mode() === 'setup'}>
           <label {...stylex.props(s.label)}>Username</label>
@@ -267,7 +400,12 @@ export function LoginPage() {
             autocomplete={mode() === 'setup' ? 'new-password' : 'current-password'}
           />
         </Show>
+
         <Show when={mode() === 'legacy'}>
+          <p {...stylex.props(styles.legacyNote)}>
+            The core's <code>ADMIN_KEY</code> is deprecated and kept only so an existing
+            deployment survives an upgrade. Prefer a user account.
+          </p>
           <label {...stylex.props(s.label)}>Admin key</label>
           <input
             type="password"
@@ -282,14 +420,19 @@ export function LoginPage() {
           <p {...stylex.props(s.error)}>{error()}</p>
         </Show>
         <button type="submit" disabled={!canSubmit()} {...stylex.props(s.btn)}>
-          {busy()
-            ? 'Working…'
-            : mode() === 'setup'
-              ? 'Create administrator'
-              : mode() === 'legacy'
-                ? 'Sign in'
-                : 'Sign in'}
+          {busy() ? 'Working…' : mode() === 'setup' ? 'Create administrator' : 'Sign in'}
         </button>
+
+        <Show when={mode() !== 'legacy'}>
+          <button
+            type="button"
+            {...stylex.props(styles.legacyLink)}
+            onClick={() => setMode(mode() === 'legacy' ? 'login' : 'legacy')}
+          >
+            {mode() === 'legacy' ? 'Back to sign in' : 'Sign in with an admin key instead'}
+          </button>
+        </Show>
+        <div {...stylex.props(styles.consoleVersion)}>Console v{CONSOLE_VERSION}</div>
       </form>
     </div>
   )
