@@ -225,19 +225,19 @@ export async function resolveWorkspaceDependencyVersion(
  * right guess for a package added to this repository later but not yet to this table.
  */
 export const FALLBACK_RANGES: Readonly<Record<string, string>> = {
-  '@hamolus/cli': '^0.2.11',
-  '@hamolus/console': '^0.2.11',
-  '@hamolus/core': '^0.2.11',
-  '@hamolus/mcp': '^0.2.11',
-  '@hamolus/panel': '^0.2.11',
-  '@hamolus/types': '^0.2.11',
+  '@hamolus/cli': '^0.2.12',
+  '@hamolus/console': '^0.2.12',
+  '@hamolus/core': '^0.2.12',
+  '@hamolus/mcp': '^0.2.12',
+  '@hamolus/panel': '^0.2.12',
+  '@hamolus/types': '^0.2.12',
   '@hamolus/plugin-console-contracts': '^0.1.0',
   '@hamolus/plugin-console-kanban': '^0.1.0',
   '@hamolus/plugin-console-todo': '^0.1.0',
 }
 
 /** What a package absent from {@link FALLBACK_RANGES} falls back to. */
-export const DEFAULT_VERSION_RANGE = '^0.2.11'
+export const DEFAULT_VERSION_RANGE = '^0.2.12'
 
 /** Resolve the fallback range for one package name. */
 export function fallbackRange(packageName: string): string {

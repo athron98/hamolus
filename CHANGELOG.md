@@ -8,6 +8,10 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.12] — 2026-10-02
+
 ### Added
 
 - **An MCP worker can reach its core over a service binding.** `CoreClient.call()` sends
