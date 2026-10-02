@@ -40,4 +40,22 @@
   // Migrating: set MCP_INSTANCE_ID, deploy, and drop the CORE_ADMIN_KEY /
   // MCP_BEARER_TOKEN secrets. Until MCP_INSTANCE_ID is set, the deprecated env path
   // still works — `GET /` on this worker will say `mode: "legacy"` and warn you.
+
+  // REACHING THE CORE FROM AN ONLINE DEPLOYMENT
+  // -------------------------------------------
+  // `CORE_API_URL` above is all you need on most accounts. On some accounts that
+  // address is not reachable from inside the Workers runtime: the request comes back
+  // as a bodyless `404` from the edge, for any path, including this worker's own
+  // hostname — so the URL is never wrong and editing it never helps. A service
+  // binding dispatches straight to the core worker in the same account instead.
+  //
+  // Commented out because it is not universally needed and it is not compatible with
+  // `pnpm dev`, where it would take precedence over the URL and try to reach the local
+  // core as a service instead of over `http://localhost:8787`. Enable it when you
+  // deploy online, with the name of your core worker:
+  //
+  //   "services": [{ "binding": "CORE", "service": "{{PROJECT_SLUG}}-core" }]
+  //
+  // The core routes on path and never reads `Host`, so the bound call reuses the URL
+  // that was already built and only the destination changes.
 }

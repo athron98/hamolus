@@ -8,7 +8,28 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **An MCP worker can reach its core over a service binding.** `CoreClient.call()` sends
+  every request through an optional `CORE` binding when one is bound, and falls back to
+  `CORE_API_URL` when it is not, so nothing changes for a deployment that has no binding.
+
+  This exists because on some Cloudflare accounts a worker cannot reach a `workers.dev`
+  address **at all** — not a sibling core, not even its own hostname — and the request
+  comes back from the edge as a `404` with no body. `CORE_API_URL` is correct in that
+  situation and editing it cannot help, which made an unreachable core look like a
+  misconfigured one. A binding dispatches straight to the worker in the same account,
+  with no DNS, TLS or public edge in the path. It is left commented out in both
+  `wrangler.jsonc` files: it is not needed on every account, and enabling it locally
+  would take precedence over the `http://localhost:8787` core that `pnpm dev` runs.
+
+### Fixed
+
+- **A failed MCP config read now names the URL it called.** It used to report only
+  `Failed to read MCP config (404): unknown error` — and `unknown error` is exactly what
+  a non-Hamolus body produces, so an edge `404`, a wrong host and a rejected instance id
+  were indistinguishable. The message carries the address and states plainly when the
+  response had no error body at all.
 
 ## [0.2.11] — 2026-10-02
 
