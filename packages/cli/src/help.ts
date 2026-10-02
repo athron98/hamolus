@@ -16,7 +16,7 @@
  */
 
 export const CLI_NAME = 'hamolus'
-export const CLI_VERSION = '0.2.10'
+export const CLI_VERSION = '0.2.11'
 
 export const CORE_MODES = ['independent', 'centralized', 'proxy', 'bridge'] as const
 export type CoreMode = (typeof CORE_MODES)[number]

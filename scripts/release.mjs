@@ -463,8 +463,9 @@ function bumpVersion(bump, dry) {
   console.log(`
 Next, in order:
 
+  node packages/cli/scripts/copy-templates.mjs  # refresh the generated copy the gate reads
   pnpm install                       # relink the workspace at ${next}
-  pnpm -w build                      # dist before publish: prepack copies templates
+  pnpm -w build                      # dist before publish
   pnpm check:package-versions        # proves the bump reached every place that carries it
   node scripts/release.mjs verify     # registry vs this tree, before anything goes out
 

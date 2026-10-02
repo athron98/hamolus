@@ -8,6 +8,10 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.11] — 2026-10-02
+
 ### Added
 
 - **Versions are now visible from the console.** `GET /api/health` (and `GET /`) report

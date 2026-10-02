@@ -24,7 +24,7 @@
  *
  * A generated console does not edit this file; the published library is what it gets.
  */
-export const FALLBACK_CONSOLE_VERSION = '0.2.10'
+export const FALLBACK_CONSOLE_VERSION = '0.2.11'
 
 /**
  * Injected by Vite as `__CONSOLE_VERSION__`. Declared rather than reached for through

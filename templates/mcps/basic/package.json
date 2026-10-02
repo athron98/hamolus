@@ -12,12 +12,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hamolus/mcp": "^0.2.10"
+    "@hamolus/mcp": "^0.2.11"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260920.0",
     "typescript": "~5.9.0",
     "wrangler": "^4.135.0",
-    "@hamolus/mcp": "^0.2.10"
+    "@hamolus/mcp": "^0.2.11"
   }
 }
