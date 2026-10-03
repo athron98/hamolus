@@ -73,7 +73,11 @@ export interface CoreHealth {
  * `setupKnown` exists because `setupRequired: false` and "the probe never came back"
  * are otherwise the same value, and the difference is whether the console should offer
  * the Setup tab at all. Defaulting a failed probe to `false` would quietly hide a first
- * administrator behind a login form nobody can satisfy.
+ * administrator behind a login form nobody can satisfy. It is also what lets a caller
+ * drop the previous endpoint's answer instead of inheriting it.
+ *
+ * `reachable` is deliberately "either probe answered", not "both did". See the comment
+ * at the return in `probe`.
  */
 export interface CoreProbe {
   reachable: boolean
@@ -544,12 +548,13 @@ export const api = {
       get<{ data?: { setupRequired?: boolean } }>('/api/_auth/setup'),
     ])
     return {
-      reachable: health?.ok === true,
+      // Either answer is enough. A core that answers the setup probe but not
+      // `/health` is still usable, and reporting it unreachable would put "Not
+      // reachable" under a URL that plainly works — so treat either success as
+      // reachable rather than guessing which of the two a deployment exposes.
+      reachable: health?.ok === true || setup?.data?.setupRequired !== undefined,
       version: typeof health?.version === 'string' ? health.version : null,
       setupRequired: setup?.data?.setupRequired === true,
-      // A core that answers the setup probe but not `/health` is still usable; treat
-      // either success as "reachable" so the hint is not wrong about a deployment that
-      // only exposes one of the two.
       setupKnown: setup?.data?.setupRequired !== undefined,
     }
   },

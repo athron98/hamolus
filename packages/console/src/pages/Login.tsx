@@ -191,7 +191,16 @@ export function LoginPage() {
       if (seq !== probeSeq) return
       setProbe(result)
       setProbing(false)
-      if (result.setupKnown) setSetupAvailable(result.setupRequired)
+      // Assigned on every answer, including one that knows nothing about setup. A
+      // conditional update would let a URL that cannot be reached keep the Setup tab
+      // from the core typed before it, which is the same class of bug the sequence
+      // guard exists to prevent: one core's state shown above another's URL.
+      setSetupAvailable(result.setupRequired)
+      // A core that already has users has no first-administrator form to fill in, so
+      // switching to one must not leave that form on screen. Scoped to `setup` on
+      // purpose: the legacy admin-key form does not depend on `setupRequired`, and
+      // typing a URL must not throw someone out of it.
+      if (mode() === 'setup' && result.setupKnown && !result.setupRequired) setMode('login')
     })
   }
 
