@@ -8,6 +8,10 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.15] — 2026-10-03
+
 ### Changed
 
 - **A one-click deployed core now answers only authenticated requests.**
