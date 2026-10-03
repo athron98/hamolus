@@ -10,6 +10,22 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 Nothing yet.
 
+## [0.2.13] — 2026-10-03
+
+### Fixed
+
+- **A core that answers the setup probe is no longer reported unreachable.** `api.probe`
+  set `reachable` from `/api/health` alone while its own comment said either answer
+  should count, so a deployment exposing only `/_auth/setup` was shown "Not reachable"
+  under a URL that plainly worked. `reachable` is now "either probe answered".
+
+- **The Setup tab no longer survives an endpoint change.** The probe's setup answer was
+  only applied when one came back, so pointing the login form at a URL that could not be
+  reached kept the previous core's Setup tab — one core's state above another's URL, the
+  same mistake the probe's sequence guard exists to prevent. The answer is now assigned
+  on every probe, and a core that already has users returns the form to Sign in. The
+  legacy admin-key form is deliberately left alone: it does not depend on `setupRequired`.
+
 ## [0.2.12] — 2026-10-02
 
 ### Added
@@ -34,18 +50,6 @@ Nothing yet.
   a non-Hamolus body produces, so an edge `404`, a wrong host and a rejected instance id
   were indistinguishable. The message carries the address and states plainly when the
   response had no error body at all.
-
-- **A core that answers the setup probe is no longer reported unreachable.** `api.probe`
-  set `reachable` from `/api/health` alone while its own comment said either answer
-  should count, so a deployment exposing only `/_auth/setup` was shown "Not reachable"
-  under a URL that plainly worked. `reachable` is now "either probe answered".
-
-- **The Setup tab no longer survives an endpoint change.** The probe's setup answer was
-  only applied when one came back, so pointing the login form at a URL that could not be
-  reached kept the previous core's Setup tab — one core's state above another's URL, the
-  same mistake the probe's sequence guard exists to prevent. The answer is now assigned
-  on every probe, and a core that already has users returns the form to Sign in. The
-  legacy admin-key form is deliberately left alone: it does not depend on `setupRequired`.
 
 ## [0.2.11] — 2026-10-02
 
