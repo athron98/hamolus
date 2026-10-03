@@ -8,6 +8,10 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.14] — 2026-10-03
+
 ### Fixed
 
 - **A one-click deployed core now declares its scope.** `wrangler.jsonc` shipped only
