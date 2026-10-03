@@ -8,7 +8,32 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **A one-click deployed core now declares its scope.** `wrangler.jsonc` shipped only
+  `PUBLIC_GETS`, so `CORE_MODE`, `DEFAULT_LAND` and `DEFAULT_COLONY` existed only as code
+  fallbacks and appeared nowhere in the Cloudflare dashboard — there was nothing to inspect
+  or change without editing the config in a fork. All three are declared now, with the
+  values the fallbacks already produced, so declaring them changes no behaviour.
+
+  `DEFAULT_LAND: "default"` reads like the name of a land called `default`. It is not:
+  `default` is a reserved scope name, so `scopeNameSchema` rejects it and `scope.ts` falls
+  through to `root_lnd` / `root_cny`. That is what `hamolus create` writes into a generated
+  core too, so the two agree — but it is documented in both places now, because a config
+  that names a scope the runtime ignores is worse than one that omits it. The
+  `configuration` preset was also missing `DEFAULT_COLONY` while carrying the other two.
+
+- **The one-click MCP instructions no longer send you down the deprecated path.** The
+  deploy block said to run `wrangler secret put CORE_ADMIN_KEY` — the pre-console
+  arrangement. A fresh deploy has an empty `MCP_INSTANCE_ID` and does need registering, so
+  the note now says to create the instance in the console and set its id, mentions the
+  per-user token callers present, and carries the `CORE_UNAVAILABLE` + `404` case with the
+  service binding that fixes it.
+
+- **The core deploy block now says what `PUBLIC_GETS: "true"` actually means** — every
+  unauthenticated `GET` on the worker answers, all collections, records, settings and
+  media, with no token. It is the only var that shipped, and the only one a reader would
+  assume was harmless.
 
 ## [0.2.13] — 2026-10-03
 

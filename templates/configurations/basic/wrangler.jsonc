@@ -54,6 +54,9 @@
     // Land used by bare (unprefixed) tenant requests.
     "DEFAULT_LAND": "default",
 
+    // Colony used by bare requests and by `x-land`-only (land admin) requests.
+    "DEFAULT_COLONY": "default",
+
     // Public sites read collections and settings without a token (GET only).
     // Auth-guarded GETs (/api/_auth/*, /api/_meta/universe/*) still require a session.
     "PUBLIC_GETS": "true"

@@ -17,9 +17,17 @@ validation, coercion, search, relations and localization.
 | `SETTINGS` | KV — the settings blob |
 | `MEDIA` | R2 — media, files and private panel assets |
 
-`CORE_MODE` (`independent` | `centralized` | `proxy` | `bridge`) and `DEFAULT_LAND`
-control land resolution. `JWT_SECRET`, `ADMIN_KEY`, `PANEL_ASSET_SECRET` and the
-`SUPER_ADMIN_*` pair are **secrets**, not vars.
+`CORE_MODE` (`independent` | `centralized` | `proxy` | `bridge`), `DEFAULT_LAND` and
+`DEFAULT_COLONY` control scope resolution, and all three are declared in
+`wrangler.jsonc` so they show up in the dashboard rather than hiding behind a code
+default. In `DEFAULT_LAND`/`DEFAULT_COLONY`, `default` is the reserved sentinel for the
+unnamed scope — the ids are `root_lnd` / `root_cny` — and a real name there is what moves
+a deployment onto a named land.
+
+`PUBLIC_GETS` (`true`) makes every unauthenticated `GET` answer: all collections,
+records, settings and media, no token. That is what an SSG site needs and what a private
+install does not want. `JWT_SECRET`, `ADMIN_KEY`, `PANEL_ASSET_SECRET` and the
+`SUPER_ADMIN_*` pair are **secrets**, not vars, and a committed config cannot carry them.
 
 ## Use it
 
