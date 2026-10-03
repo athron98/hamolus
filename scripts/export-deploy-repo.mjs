@@ -218,6 +218,39 @@ function dropPlaceholderIds(into) {
 }
 
 /**
+ * A deployed core is private unless the operator says otherwise.
+ *
+ * `packages/core/wrangler.jsonc` ships `PUBLIC_GETS: "true"` because `wrangler dev`
+ * serves the monorepo: sites and examples read the core over plain unauthenticated
+ * GETs, and a developer who flips it off locally hits a wall with no console to read
+ * errors from. That reasoning does not transfer to a Worker on the public internet,
+ * where the same flag answers every collection, record, settings blob and media object
+ * to anyone who asks, with no token.
+ *
+ * So the one-click deploy repo is exported with `false` and the local file is left alone:
+ * a default that suits a laptop is not a default that suits a hostname.
+ *
+ * Line-based for the same reason as `dropPlaceholderIds` — these files are JSONC with
+ * comments, and a parse-and-restringify round trip would strip every comment the config
+ * uses to explain itself. Throwing when there is nothing to rewrite is deliberate: a
+ * silent no-op here would ship a one-click deploy that is public, and the deploy block
+ * would then be describing a flag that is not there.
+ */
+function setDeployPublicGets(into, value) {
+  const path = join(into, 'wrangler.jsonc')
+  if (!existsSync(path)) return
+  const lines = readFileSync(path, 'utf8').split('\n')
+  const kept = lines.map((line) => {
+    const match = /^(\s*"PUBLIC_GETS"\s*:\s*)"[^"]*"(,?)(.*)$/.exec(line)
+    return match ? `${match[1]}"${value}"${match[2]}${match[3]}` : line
+  })
+  if (kept.every((line, i) => line === lines[i])) {
+    throw new Error('setDeployPublicGets: no "PUBLIC_GETS" entry in wrangler.jsonc to rewrite')
+  }
+  writeFileSync(path, kept.join('\n'))
+}
+
+/**
  * pnpm >= 10 blocks dependency lifecycle scripts unless they are allowlisted, and
  * `workerd` is the Workers runtime. Without this, `wrangler` cannot start, so the
  * Cloudflare build fails on a policy rather than on the code.
@@ -360,12 +393,18 @@ function deployNotes(pkg) {
       'or paste them into Settings → Variables and Secrets in the dashboard. Use',
       'different values than the ones in a local `.dev.vars`.',
       '',
-      '**`PUBLIC_GETS` ships as `true`, which means every unauthenticated `GET` on this',
-      'worker answers** — all collections, records, settings and media, with no token. That',
-      'is what an SSG site needs and what a private install does not. Set it to `false` in',
-      'Settings → Variables and Secrets unless you are serving a public read-only site.',
+      '**`PUBLIC_GETS` ships as `false`, so this core answers only authenticated requests.**',
+      'The monorepo runs its own core with it `true`, because examples and sites read it over',
+      'plain unauthenticated `GET`s; a Worker on a public hostname is a different situation,',
+      'and that flag would hand every collection, record, settings blob and media object to',
+      'anyone who asked. A site you add later will get `403` until you turn it on:',
+      '',
+      '```bash',
+      '# Settings → Variables and Secrets → PUBLIC_GETS, set to true',
+      '```',
+      '',
       '`CORE_MODE`, `DEFAULT_LAND` and `DEFAULT_COLONY` are declared too, so you can see and',
-      'change the scope without editing the config; `default` there is the reserved sentinel',
+      'change the scope without editing the config. `default` there is the reserved sentinel',
       'for the unnamed scope (`root_lnd` / `root_cny`), not a land by that name.',
     ]
   }
@@ -430,6 +469,7 @@ function exportOne({ pkg, repo, kind }, destRoot) {
   copyPackage(pkg, into)
   fixPackageJson(pkg, into)
   dropPlaceholderIds(into)
+  if (pkg === 'core') setDeployPublicGets(into, 'false')
   writeTsconfigBase(into)
 
   const exported = readJson(join(into, 'package.json'))

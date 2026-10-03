@@ -8,7 +8,23 @@ while pre-1.0. Versioning is described under [Releases](#releases) below.
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **A one-click deployed core now answers only authenticated requests.**
+  `PUBLIC_GETS: "true"` was shipped to the deploy repo — and it was the one var that was
+  actually there. `index.ts` skips auth for any unauthenticated `GET` when it is on, so on
+  a public hostname every collection, record, settings blob and media object answers to
+  anyone who asks.
+
+  The monorepo keeps `true`, because that same file also serves `wrangler dev`, where
+  examples and sites read the core over plain `GET`s and a developer who turns it off
+  locally has no console to read the failure from. Different situations, so the exporter
+  rewrites the value on the way out: `hamolus-labs/core` gets `false`, `packages/core` and
+  every project `hamolus create` generates are untouched. The deploy block says so, and
+  says what a site added later will hit.
+
+  `setDeployPublicGets` throws when there is no `PUBLIC_GETS` to rewrite — a silent no-op
+  would ship a public core while the deploy block described a flag that was not there.
 
 ## [0.2.14] — 2026-10-03
 
